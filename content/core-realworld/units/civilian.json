@@ -1,0 +1,65 @@
+[
+  {
+    "id": "unit.settler",
+    "name": "Settler",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "cost": {
+      "production": 80
+    },
+    "era_required": "ancient",
+    "traits": [
+      "settler"
+    ],
+    "terrain_costs": {
+      "plains": 1,
+      "grassland": 1,
+      "hills": 2,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 1,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.worker",
+    "name": "Worker",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "cost": {
+      "production": 50
+    },
+    "era_required": "ancient",
+    "traits": [
+      "worker"
+    ],
+    "harvest_traits": [
+      "harvest.basic"
+    ],
+    "terrain_costs": {
+      "plains": 1,
+      "grassland": 1,
+      "hills": 2,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 1,
+      "snow": 1.5
+    }
+  }
+]

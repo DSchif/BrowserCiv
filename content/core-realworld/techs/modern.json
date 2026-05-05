@@ -1,0 +1,74 @@
+[
+  {
+    "id": "tech.refrigeration",
+    "tree_id": "tree.realworld",
+    "name": "Refrigeration",
+    "era": "modern",
+    "cost": 1100,
+    "prereqs": ["tech.electricity"]
+  },
+  {
+    "id": "tech.replaceable_parts",
+    "tree_id": "tree.realworld",
+    "name": "Replaceable Parts",
+    "era": "modern",
+    "cost": 900,
+    "prereqs": ["tech.rifling", "tech.dynamite"],
+    "unlocks": { "units": ["unit.great_war_infantry"] }
+  },
+  {
+    "id": "tech.radio",
+    "tree_id": "tree.realworld",
+    "name": "Radio",
+    "era": "modern",
+    "cost": 1000,
+    "prereqs": ["tech.electricity"],
+    "unlocks": { "buildings": ["building.broadcast_tower"] }
+  },
+  {
+    "id": "tech.flight",
+    "tree_id": "tree.realworld",
+    "name": "Flight",
+    "era": "modern",
+    "cost": 900,
+    "prereqs": ["tech.replaceable_parts"]
+  },
+  {
+    "id": "tech.combustion",
+    "tree_id": "tree.realworld",
+    "name": "Combustion",
+    "era": "modern",
+    "cost": 1100,
+    "prereqs": ["tech.railroad", "tech.dynamite"],
+    "unlocks": { "units": ["unit.battleship"] }
+  },
+  {
+    "id": "tech.plastics",
+    "tree_id": "tree.realworld",
+    "name": "Plastics",
+    "era": "modern",
+    "cost": 1100,
+    "prereqs": ["tech.refrigeration", "tech.biology"],
+    "unlocks": {
+      "units": ["unit.infantry"],
+      "buildings": ["building.research_lab"]
+    }
+  },
+  {
+    "id": "tech.electronics",
+    "tree_id": "tree.realworld",
+    "name": "Electronics",
+    "era": "modern",
+    "cost": 1100,
+    "prereqs": ["tech.refrigeration", "tech.radio"]
+  },
+  {
+    "id": "tech.mass_media",
+    "tree_id": "tree.realworld",
+    "name": "Mass Media",
+    "era": "modern",
+    "cost": 1300,
+    "prereqs": ["tech.radio"],
+    "unlocks": { "buildings": ["building.stadium"] }
+  }
+]

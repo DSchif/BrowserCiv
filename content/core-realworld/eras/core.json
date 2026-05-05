@@ -1,0 +1,10 @@
+[
+  { "id": "ancient",      "name": "Ancient",      "order": 0 },
+  { "id": "classical",    "name": "Classical",    "order": 1 },
+  { "id": "medieval",     "name": "Medieval",     "order": 2 },
+  { "id": "renaissance",  "name": "Renaissance",  "order": 3 },
+  { "id": "industrial",   "name": "Industrial",   "order": 4 },
+  { "id": "modern",       "name": "Modern",       "order": 5 },
+  { "id": "atomic",       "name": "Atomic",       "order": 6 },
+  { "id": "information",  "name": "Information",  "order": 7 }
+]

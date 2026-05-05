@@ -1,0 +1,79 @@
+[
+  {
+    "id": "tech.iron_working",
+    "tree_id": "tree.realworld",
+    "name": "Iron Working",
+    "era": "classical",
+    "cost": 150,
+    "prereqs": ["tech.bronze_working"],
+    "unlocks": { "units": ["unit.swordsman"] }
+  },
+  {
+    "id": "tech.currency",
+    "tree_id": "tree.realworld",
+    "name": "Currency",
+    "era": "classical",
+    "cost": 105,
+    "prereqs": ["tech.bronze_working"],
+    "unlocks": { "buildings": ["building.market"] }
+  },
+  {
+    "id": "tech.mathematics",
+    "tree_id": "tree.realworld",
+    "name": "Mathematics",
+    "era": "classical",
+    "cost": 105,
+    "prereqs": ["tech.currency", "tech.the_wheel"],
+    "unlocks": { "units": ["unit.catapult"] }
+  },
+  {
+    "id": "tech.construction",
+    "tree_id": "tree.realworld",
+    "name": "Construction",
+    "era": "classical",
+    "cost": 100,
+    "prereqs": ["tech.masonry"],
+    "unlocks": {
+      "units": ["unit.composite_bowman"],
+      "buildings": ["building.colosseum"]
+    }
+  },
+  {
+    "id": "tech.horseback_riding",
+    "tree_id": "tree.realworld",
+    "name": "Horseback Riding",
+    "era": "classical",
+    "cost": 100,
+    "prereqs": ["tech.the_wheel"],
+    "unlocks": {
+      "units": ["unit.horseman"],
+      "buildings": ["building.stable"]
+    }
+  },
+  {
+    "id": "tech.optics",
+    "tree_id": "tree.realworld",
+    "name": "Optics",
+    "era": "classical",
+    "cost": 85,
+    "prereqs": ["tech.sailing"]
+  },
+  {
+    "id": "tech.philosophy",
+    "tree_id": "tree.realworld",
+    "name": "Philosophy",
+    "era": "classical",
+    "cost": 100,
+    "prereqs": ["tech.writing"],
+    "unlocks": { "buildings": ["building.temple"] }
+  },
+  {
+    "id": "tech.drama_and_poetry",
+    "tree_id": "tree.realworld",
+    "name": "Drama and Poetry",
+    "era": "classical",
+    "cost": 105,
+    "prereqs": ["tech.writing"],
+    "unlocks": { "buildings": ["building.amphitheater"] }
+  }
+]

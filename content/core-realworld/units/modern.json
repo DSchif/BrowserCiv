@@ -1,0 +1,147 @@
+[
+  {
+    "id": "unit.great_war_infantry",
+    "name": "Great War Infantry",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 50
+    },
+    "cost": {
+      "production": 250
+    },
+    "prereq_tech": "tech.replaceable_parts",
+    "era_required": "modern",
+    "evolves_to": "unit.infantry",
+    "upgrade_cost": {
+      "gold": 300
+    },
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.infantry",
+    "name": "Infantry",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 70
+    },
+    "cost": {
+      "production": 320
+    },
+    "prereq_tech": "tech.plastics",
+    "era_required": "modern",
+    "evolves_to": "unit.mech_infantry",
+    "upgrade_cost": {
+      "gold": 400
+    },
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.mech_infantry",
+    "name": "Mechanized Infantry",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 3,
+    "combat": {
+      "strength": 80
+    },
+    "cost": {
+      "production": 425
+    },
+    "prereq_tech": "tech.computers",
+    "era_required": "atomic",
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.gdr",
+    "name": "Giant Death Robot",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 6,
+    "combat": {
+      "strength": 150
+    },
+    "cost": {
+      "production": 750
+    },
+    "prereq_tech": "tech.nanotechnology",
+    "era_required": "information",
+    "traits": [
+      "infantry",
+      "armor"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  }
+]

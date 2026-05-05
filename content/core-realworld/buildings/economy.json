@@ -1,0 +1,29 @@
+[
+  {
+    "id": "building.market",
+    "name": "Market",
+    "cost": { "production": 100 },
+    "prereq_tech": "tech.currency",
+    "era_required": "classical",
+    "city_yields": { "gold": 3 },
+    "maintenance_gold": 0
+  },
+  {
+    "id": "building.bank",
+    "name": "Bank",
+    "cost": { "production": 200 },
+    "prereq_tech": "tech.banking",
+    "era_required": "renaissance",
+    "city_yields": { "gold": 5 },
+    "maintenance_gold": 0
+  },
+  {
+    "id": "building.stock_exchange",
+    "name": "Stock Exchange",
+    "cost": { "production": 300 },
+    "prereq_tech": "tech.economics",
+    "era_required": "renaissance",
+    "city_yields": { "gold": 8 },
+    "maintenance_gold": 0
+  }
+]

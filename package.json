@@ -1,0 +1,26 @@
+{
+  "name": "browserciv",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser-based extensible Civilization-style 4X game on AWS",
+  "packageManager": "pnpm@10.33.3",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "validate-content": "tsx packages/content-validator/src/cli.ts content/core-realworld",
+    "dev:client": "pnpm --filter @browserciv/client run dev",
+    "dev:server": "pnpm --filter @browserciv/server run dev",
+    "synth": "pnpm --filter @browserciv/infra run synth"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1",
+    "tsx": "^4.19.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}

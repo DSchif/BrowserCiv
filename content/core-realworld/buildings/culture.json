@@ -1,0 +1,56 @@
+[
+  {
+    "id": "building.colosseum",
+    "name": "Colosseum",
+    "cost": { "production": 75 },
+    "prereq_tech": "tech.construction",
+    "era_required": "classical",
+    "city_yields": { "culture": 2 },
+    "maintenance_gold": 2
+  },
+  {
+    "id": "building.temple",
+    "name": "Temple",
+    "cost": { "production": 100 },
+    "prereq_tech": "tech.philosophy",
+    "era_required": "classical",
+    "city_yields": { "culture": 2 },
+    "maintenance_gold": 1
+  },
+  {
+    "id": "building.amphitheater",
+    "name": "Amphitheater",
+    "cost": { "production": 100 },
+    "prereq_tech": "tech.drama_and_poetry",
+    "era_required": "classical",
+    "city_yields": { "culture": 3 },
+    "maintenance_gold": 1
+  },
+  {
+    "id": "building.opera_house",
+    "name": "Opera House",
+    "cost": { "production": 200 },
+    "prereq_tech": "tech.acoustics",
+    "era_required": "renaissance",
+    "city_yields": { "culture": 5 },
+    "maintenance_gold": 2
+  },
+  {
+    "id": "building.broadcast_tower",
+    "name": "Broadcast Tower",
+    "cost": { "production": 300 },
+    "prereq_tech": "tech.radio",
+    "era_required": "modern",
+    "city_yields": { "culture": 6 },
+    "maintenance_gold": 3
+  },
+  {
+    "id": "building.stadium",
+    "name": "Stadium",
+    "cost": { "production": 300 },
+    "prereq_tech": "tech.mass_media",
+    "era_required": "modern",
+    "city_yields": { "culture": 4, "happiness": 4 },
+    "maintenance_gold": 3
+  }
+]

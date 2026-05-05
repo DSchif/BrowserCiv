@@ -1,0 +1,35 @@
+[
+  {
+    "id": "building.stable",
+    "name": "Stable",
+    "description": "Requires Horses in city's territory.",
+    "cost": { "production": 75 },
+    "prereq_tech": "tech.horseback_riding",
+    "era_required": "classical",
+    "city_yields": { "production": 1 },
+    "maintenance_gold": 1,
+    "requires_resources": ["resource.horses"]
+  },
+  {
+    "id": "building.workshop",
+    "name": "Workshop",
+    "description": "Requires Stone in city's territory.",
+    "cost": { "production": 100 },
+    "prereq_tech": "tech.guilds",
+    "era_required": "medieval",
+    "city_yields": { "production": 2 },
+    "maintenance_gold": 2,
+    "requires_resources": ["resource.stone"]
+  },
+  {
+    "id": "building.forge",
+    "name": "Forge",
+    "description": "Requires Iron in city's territory.",
+    "cost": { "production": 120 },
+    "prereq_tech": "tech.metal_casting",
+    "era_required": "medieval",
+    "city_yields": { "production": 2 },
+    "maintenance_gold": 2,
+    "requires_resources": ["resource.iron"]
+  }
+]

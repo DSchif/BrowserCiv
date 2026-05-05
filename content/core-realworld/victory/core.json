@@ -1,0 +1,20 @@
+[
+  {
+    "id": "victory.domination",
+    "name": "Domination",
+    "description": "Be the last civ with a capital.",
+    "check": { "handler_id": "victory.domination", "params": {} }
+  },
+  {
+    "id": "victory.science",
+    "name": "Science",
+    "description": "Be the first to research the final-era spaceship sequence.",
+    "check": { "handler_id": "victory.science", "params": {} }
+  },
+  {
+    "id": "victory.time",
+    "name": "Time",
+    "description": "Highest score at the turn limit.",
+    "check": { "handler_id": "victory.time", "params": { "turn_limit": 500 } }
+  }
+]

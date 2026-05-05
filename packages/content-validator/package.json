@@ -1,0 +1,25 @@
+{
+  "name": "@browserciv/content-validator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "bin": {
+    "browserciv-validate": "./src/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "cli": "tsx src/cli.ts",
+    "test": "echo 'no tests yet'"
+  },
+  "dependencies": {
+    "@browserciv/shared": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

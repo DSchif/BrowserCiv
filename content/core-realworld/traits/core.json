@@ -1,0 +1,11 @@
+[
+  { "id": "infantry",  "name": "Infantry" },
+  { "id": "mounted",   "name": "Mounted" },
+  { "id": "ranged",    "name": "Ranged" },
+  { "id": "naval",     "name": "Naval" },
+  { "id": "siege",     "name": "Siege" },
+  { "id": "worker",    "name": "Worker" },
+  { "id": "settler",   "name": "Settler" },
+  { "id": "harvest.basic", "name": "Basic harvester" },
+  { "id": "armor",     "name": "Armored" }
+]

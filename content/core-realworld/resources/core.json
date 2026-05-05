@@ -1,0 +1,62 @@
+[
+  {
+    "id": "resource.wheat",
+    "name": "Wheat",
+    "category": "bonus",
+    "yields": { "food": 1 },
+    "harvestable_by_traits": ["harvest.basic"],
+    "appears_on_terrains": ["plains", "grassland"],
+    "appears_in_domains": ["land"],
+    "harvested_by": ["improvement.farm"]
+  },
+  {
+    "id": "resource.iron",
+    "name": "Iron",
+    "category": "strategic",
+    "yields": { "production": 2 },
+    "harvestable_by_traits": ["harvest.basic"],
+    "appears_on_terrains": ["hills"],
+    "appears_in_domains": ["land"],
+    "harvested_by": ["improvement.mine"]
+  },
+  {
+    "id": "resource.gold",
+    "name": "Gold (Luxury)",
+    "category": "luxury",
+    "yields": { "gold": 2 },
+    "harvestable_by_traits": ["harvest.basic"],
+    "appears_on_terrains": ["hills", "desert"],
+    "appears_in_domains": ["land"],
+    "harvested_by": ["improvement.mine"]
+  },
+  {
+    "id": "resource.horses",
+    "name": "Horses",
+    "category": "strategic",
+    "yields": { "production": 1, "food": 1 },
+    "harvestable_by_traits": ["harvest.basic"],
+    "appears_on_terrains": ["plains", "grassland"],
+    "appears_in_domains": ["land"],
+    "harvested_by": ["improvement.pasture"]
+  },
+  {
+    "id": "resource.stone",
+    "name": "Stone",
+    "category": "bonus",
+    "yields": { "production": 1 },
+    "harvestable_by_traits": ["harvest.basic"],
+    "appears_on_terrains": ["hills", "plains", "grassland"],
+    "appears_in_domains": ["land"],
+    "harvested_by": ["improvement.quarry"]
+  },
+  {
+    "id": "resource.coal",
+    "name": "Coal",
+    "category": "strategic",
+    "yields": { "production": 2 },
+    "harvestable_by_traits": ["harvest.basic"],
+    "appears_on_terrains": ["hills"],
+    "appears_in_domains": ["land"],
+    "harvested_by": ["improvement.mine"]
+  }
+]

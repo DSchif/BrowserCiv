@@ -1,0 +1,16 @@
+[
+  { "id": "type.melee",         "name": "Melee",         "color": "#a85828", "description": "Close-combat physical damage." },
+  { "id": "type.piercing",      "name": "Piercing",      "color": "#7d8a99", "description": "Arrows, bolts, spears." },
+  { "id": "type.anti_cavalry",  "name": "Anti-Cavalry",  "color": "#5e7a3b", "description": "Spear formations, pikes." },
+  { "id": "type.siege",         "name": "Siege",         "color": "#7a5b3a", "description": "Catapults, cannons, artillery." },
+  { "id": "type.gunpowder",     "name": "Gunpowder",     "color": "#404040", "description": "Firearms and explosive charges." },
+  { "id": "type.mounted_charge","name": "Mounted Charge","color": "#8b4513", "description": "Cavalry hoof + lance impact." },
+  { "id": "type.naval_attack",  "name": "Naval",         "color": "#3a8bbf", "description": "Cannons mounted on ships, broadsides." },
+
+  { "id": "type.infantry",      "name": "Infantry",      "color": "#9aa83a", "description": "Foot soldier — vulnerable to ranged." },
+  { "id": "type.cavalry",       "name": "Cavalry",       "color": "#8b4513", "description": "Horse-mounted — fast, vulnerable to anti-cavalry." },
+  { "id": "type.armored",       "name": "Armored",       "color": "#404040", "description": "Heavy armor — resists piercing." },
+  { "id": "type.siege_unit",    "name": "Siege Engine",  "color": "#7a5b3a", "description": "Fragile in melee, devastating at range." },
+  { "id": "type.naval_unit",    "name": "Naval Vessel",  "color": "#2c5b8f", "description": "Ship — only attackable by other ships or coastal defenses." },
+  { "id": "type.civilian",      "name": "Civilian",      "color": "#cdba60", "description": "Settler, worker — non-combatant." }
+]

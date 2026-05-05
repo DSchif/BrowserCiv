@@ -1,0 +1,46 @@
+[
+  {
+    "id": "improvement.farm",
+    "name": "Farm",
+    "terrain_compat": ["plains", "grassland"],
+    "yield_bonus": { "food": 1 },
+    "build_turns": 5
+  },
+  {
+    "id": "improvement.mine",
+    "name": "Mine",
+    "terrain_compat": ["hills"],
+    "yield_bonus": { "production": 2 },
+    "build_turns": 6
+  },
+  {
+    "id": "improvement.lumber_mill",
+    "name": "Lumber Mill",
+    "terrain_compat": ["forest"],
+    "yield_bonus": { "production": 1 },
+    "build_turns": 5
+  },
+  {
+    "id": "improvement.trading_post",
+    "name": "Trading Post",
+    "terrain_compat": ["plains", "grassland", "desert"],
+    "yield_bonus": { "gold": 1 },
+    "build_turns": 5
+  },
+  {
+    "id": "improvement.pasture",
+    "name": "Pasture",
+    "terrain_compat": ["plains", "grassland", "hills"],
+    "resource_compat": ["resource.horses"],
+    "yield_bonus": { "production": 1 },
+    "build_turns": 5
+  },
+  {
+    "id": "improvement.quarry",
+    "name": "Quarry",
+    "terrain_compat": ["hills", "plains", "grassland"],
+    "resource_compat": ["resource.stone"],
+    "yield_bonus": { "production": 1 },
+    "build_turns": 6
+  }
+]

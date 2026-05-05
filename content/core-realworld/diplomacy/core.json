@@ -1,0 +1,23 @@
+[
+  {
+    "id": "diplomacy.declare_war",
+    "name": "Declare War",
+    "requires_state": { "relationship": "peace" }
+  },
+  {
+    "id": "diplomacy.make_peace",
+    "name": "Make Peace",
+    "requires_state": { "relationship": "war" }
+  },
+  {
+    "id": "diplomacy.open_borders",
+    "name": "Open Borders",
+    "requires_state": { "relationship": "peace" }
+  },
+  {
+    "id": "diplomacy.lease_unit",
+    "name": "Lease Unit",
+    "description": "Temporarily transfer control of a unit to another civ so they can harvest a resource you can.",
+    "requires_state": { "relationship": "peace" }
+  }
+]

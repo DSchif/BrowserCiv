@@ -1,0 +1,192 @@
+[
+  {
+    "id": "unit.chariot_archer",
+    "name": "Chariot Archer",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 4,
+    "combat": {
+      "strength": 6,
+      "ranged_strength": 9,
+      "range": 2
+    },
+    "cost": {
+      "production": 56
+    },
+    "prereq_tech": "tech.the_wheel",
+    "era_required": "ancient",
+    "evolves_to": "unit.horseman",
+    "upgrade_cost": {
+      "gold": 75
+    },
+    "traits": [
+      "mounted",
+      "ranged"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.horseman",
+    "name": "Horseman",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 4,
+    "combat": {
+      "strength": 12
+    },
+    "cost": {
+      "production": 75
+    },
+    "prereq_tech": "tech.horseback_riding",
+    "era_required": "classical",
+    "evolves_to": "unit.knight",
+    "upgrade_cost": {
+      "gold": 100
+    },
+    "traits": [
+      "mounted"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.knight",
+    "name": "Knight",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 4,
+    "combat": {
+      "strength": 20
+    },
+    "cost": {
+      "production": 120
+    },
+    "prereq_tech": "tech.chivalry",
+    "era_required": "medieval",
+    "evolves_to": "unit.cavalry",
+    "upgrade_cost": {
+      "gold": 175
+    },
+    "traits": [
+      "mounted"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.cavalry",
+    "name": "Cavalry",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 4,
+    "combat": {
+      "strength": 34
+    },
+    "cost": {
+      "production": 240
+    },
+    "prereq_tech": "tech.military_science",
+    "era_required": "industrial",
+    "evolves_to": "unit.modern_armor",
+    "upgrade_cost": {
+      "gold": 300
+    },
+    "traits": [
+      "mounted"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.modern_armor",
+    "name": "Modern Armor",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 5,
+    "combat": {
+      "strength": 100
+    },
+    "cost": {
+      "production": 425
+    },
+    "prereq_tech": "tech.lasers",
+    "era_required": "atomic",
+    "traits": [
+      "mounted",
+      "armor"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  }
+]

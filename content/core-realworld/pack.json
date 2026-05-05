@@ -1,0 +1,8 @@
+{
+  "id": "core.realworld",
+  "name": "Real-World Civilizations (Core)",
+  "version": "0.1.0",
+  "description": "BrowserCiv core pack — real-world civilizations and the standard tech tree.",
+  "author": "BrowserCiv",
+  "depends_on": []
+}

@@ -1,0 +1,32 @@
+[
+  { "attacker": "type.melee",          "defender": "type.armored",     "multiplier": 0.85 },
+  { "attacker": "type.melee",          "defender": "type.siege_unit",  "multiplier": 1.5 },
+  { "attacker": "type.melee",          "defender": "type.civilian",    "multiplier": 2.0 },
+  { "attacker": "type.melee",          "defender": "type.naval_unit",  "multiplier": 0 },
+
+  { "attacker": "type.piercing",       "defender": "type.armored",     "multiplier": 0.5 },
+  { "attacker": "type.piercing",       "defender": "type.naval_unit",  "multiplier": 0.85 },
+  { "attacker": "type.piercing",       "defender": "type.civilian",    "multiplier": 1.5 },
+
+  { "attacker": "type.anti_cavalry",   "defender": "type.cavalry",     "multiplier": 1.5 },
+  { "attacker": "type.anti_cavalry",   "defender": "type.armored",     "multiplier": 1.25 },
+  { "attacker": "type.anti_cavalry",   "defender": "type.infantry",    "multiplier": 0.85 },
+  { "attacker": "type.anti_cavalry",   "defender": "type.naval_unit",  "multiplier": 0 },
+
+  { "attacker": "type.siege",          "defender": "type.infantry",    "multiplier": 0.85 },
+  { "attacker": "type.siege",          "defender": "type.cavalry",     "multiplier": 0.75 },
+  { "attacker": "type.siege",          "defender": "type.armored",     "multiplier": 1.0 },
+  { "attacker": "type.siege",          "defender": "type.civilian",    "multiplier": 1.5 },
+
+  { "attacker": "type.gunpowder",      "defender": "type.armored",     "multiplier": 0.9 },
+  { "attacker": "type.gunpowder",      "defender": "type.cavalry",     "multiplier": 1.1 },
+  { "attacker": "type.gunpowder",      "defender": "type.civilian",    "multiplier": 1.5 },
+
+  { "attacker": "type.mounted_charge", "defender": "type.siege_unit",  "multiplier": 1.5 },
+  { "attacker": "type.mounted_charge", "defender": "type.armored",     "multiplier": 0.85 },
+  { "attacker": "type.mounted_charge", "defender": "type.naval_unit",  "multiplier": 0 },
+  { "attacker": "type.mounted_charge", "defender": "type.civilian",    "multiplier": 2.0 },
+
+  { "attacker": "type.naval_attack",   "defender": "type.naval_unit",  "multiplier": 1.0 },
+  { "attacker": "type.naval_attack",   "defender": "type.civilian",    "multiplier": 1.5 }
+]

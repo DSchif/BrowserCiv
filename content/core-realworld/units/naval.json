@@ -1,0 +1,242 @@
+[
+  {
+    "id": "unit.trireme",
+    "name": "Trireme",
+    "domain": "ocean",
+    "passable_domains": [
+      "ocean",
+      "coast"
+    ],
+    "movement": 4,
+    "combat": {
+      "strength": 10
+    },
+    "cost": {
+      "production": 45
+    },
+    "prereq_tech": "tech.sailing",
+    "era_required": "ancient",
+    "evolves_to": "unit.galleass",
+    "upgrade_cost": {
+      "gold": 75
+    },
+    "traits": [
+      "naval"
+    ],
+    "transport_capacity": 1,
+    "terrain_costs": {
+      "ocean": 1,
+      "deep_ocean": 0,
+      "coast": 1,
+      "plains": 0,
+      "grassland": 0,
+      "hills": 0,
+      "forest": 0,
+      "desert": 0,
+      "mountain": 0,
+      "jungle": 0,
+      "tundra": 0,
+      "snow": 0
+    }
+  },
+  {
+    "id": "unit.galleass",
+    "name": "Galleass",
+    "domain": "ocean",
+    "passable_domains": [
+      "ocean",
+      "coast"
+    ],
+    "movement": 4,
+    "combat": {
+      "strength": 11,
+      "ranged_strength": 15,
+      "range": 2
+    },
+    "cost": {
+      "production": 100
+    },
+    "prereq_tech": "tech.compass",
+    "era_required": "medieval",
+    "evolves_to": "unit.frigate",
+    "upgrade_cost": {
+      "gold": 150
+    },
+    "traits": [
+      "naval",
+      "ranged"
+    ],
+    "transport_capacity": 1,
+    "terrain_costs": {
+      "ocean": 1,
+      "deep_ocean": 0,
+      "coast": 1,
+      "plains": 0,
+      "grassland": 0,
+      "hills": 0,
+      "forest": 0,
+      "desert": 0,
+      "mountain": 0,
+      "jungle": 0,
+      "tundra": 0,
+      "snow": 0
+    }
+  },
+  {
+    "id": "unit.caravel",
+    "name": "Caravel",
+    "domain": "ocean",
+    "passable_domains": [
+      "ocean",
+      "coast"
+    ],
+    "movement": 4,
+    "combat": {
+      "strength": 20
+    },
+    "cost": {
+      "production": 100
+    },
+    "prereq_tech": "tech.astronomy",
+    "era_required": "renaissance",
+    "traits": [
+      "naval"
+    ],
+    "transport_capacity": 3,
+    "terrain_costs": {
+      "ocean": 1,
+      "deep_ocean": 1,
+      "coast": 1,
+      "plains": 0,
+      "grassland": 0,
+      "hills": 0,
+      "forest": 0,
+      "desert": 0,
+      "mountain": 0,
+      "jungle": 0,
+      "tundra": 0,
+      "snow": 0
+    }
+  },
+  {
+    "id": "unit.frigate",
+    "name": "Frigate",
+    "domain": "ocean",
+    "passable_domains": [
+      "ocean",
+      "coast"
+    ],
+    "movement": 5,
+    "combat": {
+      "strength": 28,
+      "ranged_strength": 25,
+      "range": 2
+    },
+    "cost": {
+      "production": 175
+    },
+    "prereq_tech": "tech.navigation",
+    "era_required": "renaissance",
+    "evolves_to": "unit.ironclad",
+    "upgrade_cost": {
+      "gold": 225
+    },
+    "traits": [
+      "naval",
+      "ranged"
+    ],
+    "transport_capacity": 1,
+    "terrain_costs": {
+      "ocean": 1,
+      "deep_ocean": 1,
+      "coast": 1,
+      "plains": 0,
+      "grassland": 0,
+      "hills": 0,
+      "forest": 0,
+      "desert": 0,
+      "mountain": 0,
+      "jungle": 0,
+      "tundra": 0,
+      "snow": 0
+    }
+  },
+  {
+    "id": "unit.ironclad",
+    "name": "Ironclad",
+    "domain": "ocean",
+    "passable_domains": [
+      "ocean",
+      "coast"
+    ],
+    "movement": 4,
+    "combat": {
+      "strength": 38
+    },
+    "cost": {
+      "production": 285
+    },
+    "prereq_tech": "tech.steam_power",
+    "era_required": "industrial",
+    "evolves_to": "unit.battleship",
+    "upgrade_cost": {
+      "gold": 325
+    },
+    "traits": [
+      "naval"
+    ],
+    "transport_capacity": 2,
+    "terrain_costs": {
+      "ocean": 1,
+      "deep_ocean": 1,
+      "coast": 1,
+      "plains": 0,
+      "grassland": 0,
+      "hills": 0,
+      "forest": 0,
+      "desert": 0,
+      "mountain": 0,
+      "jungle": 0,
+      "tundra": 0,
+      "snow": 0
+    }
+  },
+  {
+    "id": "unit.battleship",
+    "name": "Battleship",
+    "domain": "ocean",
+    "passable_domains": [
+      "ocean",
+      "coast"
+    ],
+    "movement": 6,
+    "combat": {
+      "strength": 50,
+      "ranged_strength": 55,
+      "range": 3
+    },
+    "cost": {
+      "production": 425
+    },
+    "prereq_tech": "tech.combustion",
+    "era_required": "modern",
+    "traits": [
+      "naval",
+      "ranged"
+    ],
+    "terrain_costs": {
+      "ocean": 1,
+      "deep_ocean": 1,
+      "coast": 1,
+      "plains": 0,
+      "grassland": 0,
+      "hills": 0,
+      "forest": 0,
+      "desert": 0,
+      "mountain": 0,
+      "jungle": 0,
+      "tundra": 0,
+      "snow": 0
+    }
+  }
+]

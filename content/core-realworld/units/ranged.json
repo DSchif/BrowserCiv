@@ -1,0 +1,118 @@
+[
+  {
+    "id": "unit.archer",
+    "name": "Archer",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 5,
+      "ranged_strength": 7,
+      "range": 2
+    },
+    "cost": {
+      "production": 40
+    },
+    "prereq_tech": "tech.archery",
+    "era_required": "ancient",
+    "evolves_to": "unit.composite_bowman",
+    "upgrade_cost": {
+      "gold": 60
+    },
+    "traits": [
+      "ranged"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.composite_bowman",
+    "name": "Composite Bowman",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 7,
+      "ranged_strength": 11,
+      "range": 2
+    },
+    "cost": {
+      "production": 75
+    },
+    "prereq_tech": "tech.construction",
+    "era_required": "classical",
+    "evolves_to": "unit.crossbowman",
+    "upgrade_cost": {
+      "gold": 90
+    },
+    "traits": [
+      "ranged"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.crossbowman",
+    "name": "Crossbowman",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 13,
+      "ranged_strength": 18,
+      "range": 2
+    },
+    "cost": {
+      "production": 120
+    },
+    "prereq_tech": "tech.machinery",
+    "era_required": "medieval",
+    "traits": [
+      "ranged"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  }
+]

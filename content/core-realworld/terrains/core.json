@@ -1,0 +1,85 @@
+[
+  {
+    "id": "plains",
+    "name": "Plains",
+    "base_yields": { "food": 1, "production": 1 },
+    "movement_cost": 1,
+    "domains": ["land"]
+  },
+  {
+    "id": "grassland",
+    "name": "Grassland",
+    "base_yields": { "food": 2 },
+    "movement_cost": 1,
+    "domains": ["land"]
+  },
+  {
+    "id": "hills",
+    "name": "Hills",
+    "base_yields": { "production": 2 },
+    "movement_cost": 2,
+    "domains": ["land"]
+  },
+  {
+    "id": "mountain",
+    "name": "Mountain",
+    "movement_cost": 0,
+    "impassable": true,
+    "domains": ["land"]
+  },
+  {
+    "id": "coast",
+    "name": "Coast",
+    "base_yields": { "food": 1, "gold": 1 },
+    "movement_cost": 1,
+    "domains": ["coast", "ocean"]
+  },
+  {
+    "id": "ocean",
+    "name": "Ocean",
+    "base_yields": { "food": 1 },
+    "movement_cost": 1,
+    "domains": ["ocean"]
+  },
+  {
+    "id": "deep_ocean",
+    "name": "Deep Ocean",
+    "base_yields": { "food": 1 },
+    "movement_cost": 1,
+    "impassable": true,
+    "domains": ["ocean"]
+  },
+  {
+    "id": "desert",
+    "name": "Desert",
+    "movement_cost": 1,
+    "domains": ["land"]
+  },
+  {
+    "id": "forest",
+    "name": "Forest",
+    "base_yields": { "production": 1 },
+    "movement_cost": 2,
+    "domains": ["land"]
+  },
+  {
+    "id": "jungle",
+    "name": "Jungle",
+    "base_yields": { "food": 1 },
+    "movement_cost": 2,
+    "domains": ["land"]
+  },
+  {
+    "id": "tundra",
+    "name": "Tundra",
+    "base_yields": { "food": 1 },
+    "movement_cost": 1,
+    "domains": ["land"]
+  },
+  {
+    "id": "snow",
+    "name": "Snow",
+    "movement_cost": 2,
+    "domains": ["land"]
+  }
+]

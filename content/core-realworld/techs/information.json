@@ -1,0 +1,83 @@
+[
+  {
+    "id": "tech.satellites",
+    "tree_id": "tree.realworld",
+    "name": "Satellites",
+    "era": "information",
+    "cost": 2000,
+    "prereqs": ["tech.rocketry"]
+  },
+  {
+    "id": "tech.stealth",
+    "tree_id": "tree.realworld",
+    "name": "Stealth",
+    "era": "information",
+    "cost": 2200,
+    "prereqs": ["tech.lasers"]
+  },
+  {
+    "id": "tech.advanced_ballistics",
+    "tree_id": "tree.realworld",
+    "name": "Advanced Ballistics",
+    "era": "information",
+    "cost": 2200,
+    "prereqs": ["tech.rocketry"]
+  },
+  {
+    "id": "tech.mobile_tactics",
+    "tree_id": "tree.realworld",
+    "name": "Mobile Tactics",
+    "era": "information",
+    "cost": 2200,
+    "prereqs": ["tech.lasers", "tech.robotics"]
+  },
+  {
+    "id": "tech.telecommunications",
+    "tree_id": "tree.realworld",
+    "name": "Telecommunications",
+    "era": "information",
+    "cost": 2400,
+    "prereqs": ["tech.satellites", "tech.mass_media"]
+  },
+  {
+    "id": "tech.globalization",
+    "tree_id": "tree.realworld",
+    "name": "Globalization",
+    "era": "information",
+    "cost": 2400,
+    "prereqs": ["tech.telecommunications"]
+  },
+  {
+    "id": "tech.particle_physics",
+    "tree_id": "tree.realworld",
+    "name": "Particle Physics",
+    "era": "information",
+    "cost": 2400,
+    "prereqs": ["tech.lasers", "tech.satellites"]
+  },
+  {
+    "id": "tech.nanotechnology",
+    "tree_id": "tree.realworld",
+    "name": "Nanotechnology",
+    "era": "information",
+    "cost": 2600,
+    "prereqs": ["tech.particle_physics"],
+    "unlocks": { "units": ["unit.gdr"] }
+  },
+  {
+    "id": "tech.internet",
+    "tree_id": "tree.realworld",
+    "name": "Internet",
+    "era": "information",
+    "cost": 2600,
+    "prereqs": ["tech.computers", "tech.telecommunications"]
+  },
+  {
+    "id": "tech.future_tech",
+    "tree_id": "tree.realworld",
+    "name": "Future Tech",
+    "era": "information",
+    "cost": 2800,
+    "prereqs": ["tech.internet", "tech.globalization", "tech.particle_physics", "tech.nanotechnology"]
+  }
+]

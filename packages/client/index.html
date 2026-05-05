@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BrowserCiv</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; height: 100%; background: #0e1116; color: #e6edf3; font-family: system-ui, sans-serif; }
+      #app-root { width: 100vw; height: 100vh; }
+      #game-canvas { position: fixed; inset: 0; z-index: 0; }
+
+      .lobby { max-width: 720px; margin: 32px auto; padding: 24px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; }
+      .lobby h1 { margin-top: 0; }
+      .lobby .row { display: flex; gap: 16px; align-items: center; margin: 12px 0; }
+      .lobby label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+      .lobby input, .lobby select { background: #0e1116; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; padding: 6px 8px; font-size: 14px; }
+      .lobby button { background: #238636; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+      .lobby button:hover { background: #2ea043; }
+      .lobby ul { list-style: none; padding: 0; }
+      .lobby li { padding: 8px 12px; background: #0e1116; border: 1px solid #30363d; border-radius: 4px; margin: 6px 0; display: flex; gap: 12px; align-items: center; }
+      .lobby li button { margin-left: auto; background: #1f6feb; }
+      .lobby li button:hover { background: #388bfd; }
+      .lobby code { background: #0e1116; padding: 2px 6px; border-radius: 3px; font-size: 12px; border: 1px solid #30363d; }
+      .lobby .dim { color: #8b949e; }
+      .lobby .error { color: #f85149; min-height: 1em; }
+
+      .hud { position: fixed; top: 12px; left: 12px; padding: 12px 16px; background: rgba(13, 17, 23, 0.92); border: 1px solid #30363d; border-radius: 8px; z-index: 1; min-width: 280px; max-width: 380px; font-size: 13px; }
+      .hud .hud-row { margin: 4px 0; display: flex; gap: 8px; align-items: center; }
+      .hud strong { color: #8b949e; min-width: 70px; font-weight: 500; }
+      .hud code { background: #0e1116; padding: 1px 6px; border-radius: 3px; font-size: 11px; border: 1px solid #30363d; }
+      .hud ul { list-style: none; padding: 0; margin: 4px 0; }
+      .hud ul li { padding: 4px 8px; background: #0e1116; border-radius: 4px; margin: 3px 0; display: flex; align-items: center; gap: 6px; }
+      .hud .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; border: 2px solid transparent; box-sizing: border-box; }
+      .hud .tag { background: #1f6feb; color: white; font-size: 10px; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
+      .hud .tag-active { background: #d29922; color: black; }
+      .hud em { color: #8b949e; font-style: normal; }
+      .hud .buttons { gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+      .hud button { background: #238636; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; }
+      .hud button:hover:not(:disabled) { background: #2ea043; }
+      .hud button:disabled { background: #30363d; color: #8b949e; cursor: not-allowed; }
+      .hud button#leave { background: #6e7681; }
+      .hud button#leave:hover { background: #8b949e; }
+      .hud button#found { background: #d29922; color: #0e1116; }
+      .hud button#found:hover:not(:disabled) { background: #f0b837; }
+
+      .tile-info { position: fixed; bottom: 12px; left: 12px; background: rgba(13,17,23,0.96); border: 1px solid #30363d; border-radius: 6px; padding: 8px 10px; z-index: 3; font-size: 12px; min-width: 180px; max-width: 240px; pointer-events: none; }
+      .tile-info.hidden { display: none; }
+      .tile-info .ti-row { margin: 2px 0; }
+      .tile-info .dim { color: #8b949e; font-size: 11px; }
+      .tile-info .ti-y { display: inline-block; padding: 1px 5px; margin-right: 3px; background: #0e1116; border-radius: 3px; font-family: monospace; font-size: 10px; }
+      .tile-info .ti-y.food { color: #8be97a; }
+      .tile-info .ti-y.production { color: #d29922; }
+      .tile-info .ti-y.gold { color: #f0d040; }
+      .tile-info .ti-y.science { color: #58a6ff; }
+      .tile-info .ti-y.culture { color: #c084fc; }
+      .tile-info .ti-tag { display: inline-block; padding: 0 5px; border-radius: 3px; font-size: 10px; margin-left: 4px; }
+      .tile-info .ti-tag.ok { background: #1f6feb; color: white; }
+      .tile-info .ti-tag.warn { background: #d29922; color: #0e1116; }
+      .attack-picker { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(13,17,23,0.98); border: 1px solid #d29922; border-radius: 8px; padding: 8px; z-index: 5; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.6); }
+      .attack-picker.hidden { display: none; }
+      .attack-picker .ap-title { color: #d29922; font-weight: bold; padding: 2px 8px; font-size: 12px; }
+      .attack-picker .ap-btn { display: flex; flex-direction: column; align-items: flex-start; padding: 6px 12px; background: #1f6feb; color: white; border: none; border-radius: 4px; cursor: pointer; min-width: 220px; text-align: left; }
+      .attack-picker .ap-btn:hover { background: #388bfd; }
+      .attack-picker .ap-btn span { font-size: 11px; color: #c9d1d9; opacity: 0.85; }
+      .attack-picker .ap-cancel { background: #30363d; color: #8b949e; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+      .city-panel { position: fixed; top: 12px; right: 12px; width: 320px; max-height: 92vh; overflow-y: auto; background: rgba(13,17,23,0.96); border: 1px solid #30363d; border-radius: 8px; z-index: 2; padding: 12px; font-size: 13px; }
+      .city-panel.hidden { display: none; }
+      .city-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+      .city-panel h2 { margin: 0; font-size: 16px; }
+      .city-panel #cp-close { background: transparent; color: #8b949e; border: none; font-size: 24px; cursor: pointer; padding: 0 6px; }
+      .city-panel .cp-row { margin: 6px 0; }
+      .city-panel strong { color: #8b949e; font-weight: 500; margin-right: 4px; }
+      .city-panel .yield { display: inline-block; margin-right: 6px; padding: 1px 6px; background: #0e1116; border-radius: 3px; font-family: monospace; font-size: 11px; }
+      .city-panel .dim { color: #8b949e; }
+      .city-panel .cp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+      .city-panel button.cp-build { background: #1f6feb; color: white; border: none; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; text-align: left; }
+      .city-panel button.cp-build:hover:not(:disabled) { background: #388bfd; }
+      .city-panel button.cp-build:disabled { background: #30363d; color: #8b949e; cursor: not-allowed; }
+      .city-panel button.cp-clear { background: #6e7681; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+      .city-panel button.cp-clear:disabled { background: #30363d; color: #8b949e; }
+      .city-panel button.cp-build.current { background: #d29922; color: #0e1116; }
+      /* Tech tree (Civ-V style horizontal) */
+      #tech-panel { width: 70vw; max-width: 1100px; }
+      .tech-tree-scroll { overflow-x: auto; overflow-y: auto; max-height: 70vh; border: 1px solid #30363d; border-radius: 4px; background: #0a0d12; }
+      .tech-tree-canvas { position: relative; }
+      .tech-tree-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
+      .tech-tree-svg path { fill: none; stroke: #444; stroke-width: 1.5; }
+      .tech-era-header { position: absolute; top: 8px; padding: 4px 8px; background: #161b22; color: #8b949e; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 3px; text-align: center; }
+      .tech-box { position: absolute; padding: 6px 8px; border: 2px solid #30363d; border-radius: 4px; cursor: pointer; text-align: left; font-size: 12px; background: #21262d; color: #e6edf3; display: flex; flex-direction: column; gap: 2px; }
+      .tech-box:hover:not(:disabled) { transform: scale(1.03); z-index: 2; }
+      .tech-box:disabled { cursor: not-allowed; }
+      .tech-box-name { font-weight: bold; font-size: 12px; line-height: 1.1; }
+      .tech-box-cost { font-size: 10px; opacity: 0.8; font-family: monospace; }
+      .tech-box-unlocks { font-size: 10px; opacity: 0.7; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .tech-box.tech-locked { background: #1a1d22; color: #6e7681; border-color: #30363d; opacity: 0.6; }
+      .tech-box.tech-available { background: #3a2a08; color: #f0b837; border-color: #d29922; }
+      .tech-box.tech-current { background: #0a3050; color: #79c0ff; border-color: #4493f8; }
+      .tech-box.tech-researched { background: #0f3a1f; color: #7ee787; border-color: #2ea043; }
+      .tech-progress-bar { position: absolute; bottom: 4px; left: 8px; right: 8px; height: 3px; background: #000; border-radius: 2px; overflow: hidden; }
+      .tech-progress-fill { height: 100%; background: #79c0ff; }
+      .hud button#tech { background: #4493f8; color: white; }
+      .hud button#tech:hover:not(:disabled) { background: #5ba3ff; }
+      .hud button#upgrade { background: #d29922; color: #0e1116; }
+      .hud button#upgrade:hover:not(:disabled) { background: #f0b837; }
+      .hud button#diplomacy { background: #bf4b8a; color: white; }
+      .hud button#diplomacy:hover:not(:disabled) { background: #d263a4; }
+      #diplo-panel { left: auto; right: 12px; top: 12px; }
+      .hud .hidden { display: none; }
+      .improvements-list { display: flex; flex-wrap: wrap; gap: 4px; }
+      .improvements-list button.cp-build { background: #1f6feb; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+      .improvements-list button.cp-build:hover { background: #388bfd; }
+    </style>
+  </head>
+  <body>
+    <div id="app-root"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

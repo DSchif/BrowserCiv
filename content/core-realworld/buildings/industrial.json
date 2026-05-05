@@ -1,0 +1,49 @@
+[
+  {
+    "id": "building.factory",
+    "name": "Factory",
+    "description": "Requires Coal in city's territory.",
+    "cost": { "production": 360 },
+    "prereq_tech": "tech.industrialization",
+    "era_required": "industrial",
+    "city_yields": { "production": 4 },
+    "maintenance_gold": 3,
+    "requires_resources": ["resource.coal"]
+  },
+  {
+    "id": "building.hospital",
+    "name": "Hospital",
+    "cost": { "production": 360 },
+    "prereq_tech": "tech.biology",
+    "era_required": "industrial",
+    "city_yields": { "food": 5 },
+    "maintenance_gold": 2
+  },
+  {
+    "id": "building.hydro_plant",
+    "name": "Hydro Plant",
+    "cost": { "production": 540 },
+    "prereq_tech": "tech.electricity",
+    "era_required": "industrial",
+    "city_yields": { "production": 5 },
+    "maintenance_gold": 3
+  },
+  {
+    "id": "building.recycling_center",
+    "name": "Recycling Center",
+    "cost": { "production": 360 },
+    "prereq_tech": "tech.ecology",
+    "era_required": "atomic",
+    "city_yields": { "production": 2 },
+    "maintenance_gold": 2
+  },
+  {
+    "id": "building.nuclear_plant",
+    "name": "Nuclear Plant",
+    "cost": { "production": 540 },
+    "prereq_tech": "tech.nuclear_fission",
+    "era_required": "atomic",
+    "city_yields": { "production": 6 },
+    "maintenance_gold": 4
+  }
+]

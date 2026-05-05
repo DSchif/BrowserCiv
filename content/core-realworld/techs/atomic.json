@@ -1,0 +1,54 @@
+[
+  {
+    "id": "tech.ecology",
+    "tree_id": "tree.realworld",
+    "name": "Ecology",
+    "era": "atomic",
+    "cost": 1500,
+    "prereqs": ["tech.plastics", "tech.biology"],
+    "unlocks": { "buildings": ["building.recycling_center"] }
+  },
+  {
+    "id": "tech.nuclear_fission",
+    "tree_id": "tree.realworld",
+    "name": "Nuclear Fission",
+    "era": "atomic",
+    "cost": 1500,
+    "prereqs": ["tech.refrigeration"],
+    "unlocks": { "buildings": ["building.nuclear_plant"] }
+  },
+  {
+    "id": "tech.computers",
+    "tree_id": "tree.realworld",
+    "name": "Computers",
+    "era": "atomic",
+    "cost": 1500,
+    "prereqs": ["tech.mass_media", "tech.electronics"],
+    "unlocks": { "units": ["unit.mech_infantry"] }
+  },
+  {
+    "id": "tech.rocketry",
+    "tree_id": "tree.realworld",
+    "name": "Rocketry",
+    "era": "atomic",
+    "cost": 1500,
+    "prereqs": ["tech.nuclear_fission"]
+  },
+  {
+    "id": "tech.robotics",
+    "tree_id": "tree.realworld",
+    "name": "Robotics",
+    "era": "atomic",
+    "cost": 1700,
+    "prereqs": ["tech.computers"]
+  },
+  {
+    "id": "tech.lasers",
+    "tree_id": "tree.realworld",
+    "name": "Lasers",
+    "era": "atomic",
+    "cost": 1700,
+    "prereqs": ["tech.computers"],
+    "unlocks": { "units": ["unit.modern_armor"] }
+  }
+]

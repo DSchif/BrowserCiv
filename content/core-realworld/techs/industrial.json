@@ -1,0 +1,90 @@
+[
+  {
+    "id": "tech.industrialization",
+    "tree_id": "tree.realworld",
+    "name": "Industrialization",
+    "era": "industrial",
+    "cost": 700,
+    "prereqs": ["tech.chemistry", "tech.banking"],
+    "unlocks": { "buildings": ["building.factory"] }
+  },
+  {
+    "id": "tech.scientific_theory",
+    "tree_id": "tree.realworld",
+    "name": "Scientific Theory",
+    "era": "industrial",
+    "cost": 650,
+    "prereqs": ["tech.acoustics"],
+    "unlocks": { "buildings": ["building.public_school"] }
+  },
+  {
+    "id": "tech.military_science",
+    "tree_id": "tree.realworld",
+    "name": "Military Science",
+    "era": "industrial",
+    "cost": 650,
+    "prereqs": ["tech.gunpowder", "tech.economics"],
+    "unlocks": { "units": ["unit.cavalry"] }
+  },
+  {
+    "id": "tech.fertilizer",
+    "tree_id": "tree.realworld",
+    "name": "Fertilizer",
+    "era": "industrial",
+    "cost": 600,
+    "prereqs": ["tech.scientific_theory"]
+  },
+  {
+    "id": "tech.rifling",
+    "tree_id": "tree.realworld",
+    "name": "Rifling",
+    "era": "industrial",
+    "cost": 700,
+    "prereqs": ["tech.military_science"],
+    "unlocks": { "units": ["unit.rifleman"] }
+  },
+  {
+    "id": "tech.steam_power",
+    "tree_id": "tree.realworld",
+    "name": "Steam Power",
+    "era": "industrial",
+    "cost": 600,
+    "prereqs": ["tech.scientific_theory"],
+    "unlocks": { "units": ["unit.ironclad"] }
+  },
+  {
+    "id": "tech.dynamite",
+    "tree_id": "tree.realworld",
+    "name": "Dynamite",
+    "era": "industrial",
+    "cost": 600,
+    "prereqs": ["tech.chemistry", "tech.military_science"],
+    "unlocks": { "units": ["unit.artillery"] }
+  },
+  {
+    "id": "tech.biology",
+    "tree_id": "tree.realworld",
+    "name": "Biology",
+    "era": "industrial",
+    "cost": 700,
+    "prereqs": ["tech.scientific_theory"],
+    "unlocks": { "buildings": ["building.hospital"] }
+  },
+  {
+    "id": "tech.electricity",
+    "tree_id": "tree.realworld",
+    "name": "Electricity",
+    "era": "industrial",
+    "cost": 700,
+    "prereqs": ["tech.biology", "tech.steam_power"],
+    "unlocks": { "buildings": ["building.hydro_plant"] }
+  },
+  {
+    "id": "tech.railroad",
+    "tree_id": "tree.realworld",
+    "name": "Railroad",
+    "era": "industrial",
+    "cost": 800,
+    "prereqs": ["tech.steam_power", "tech.scientific_theory"]
+  }
+]

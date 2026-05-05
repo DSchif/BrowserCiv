@@ -1,0 +1,165 @@
+[
+  {
+    "id": "unit.catapult",
+    "name": "Catapult",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 4,
+      "ranged_strength": 8,
+      "range": 2
+    },
+    "cost": {
+      "production": 56,
+      "resources": {
+        "resource.iron": 1
+      }
+    },
+    "prereq_tech": "tech.mathematics",
+    "era_required": "classical",
+    "evolves_to": "unit.trebuchet",
+    "upgrade_cost": {
+      "gold": 80
+    },
+    "traits": [
+      "siege",
+      "ranged"
+    ],
+    "terrain_costs": {
+      "plains": 1,
+      "grassland": 1,
+      "hills": 2,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 1,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.trebuchet",
+    "name": "Trebuchet",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 8,
+      "ranged_strength": 14,
+      "range": 2
+    },
+    "cost": {
+      "production": 120
+    },
+    "prereq_tech": "tech.physics",
+    "era_required": "medieval",
+    "evolves_to": "unit.cannon",
+    "upgrade_cost": {
+      "gold": 175
+    },
+    "traits": [
+      "siege",
+      "ranged"
+    ],
+    "terrain_costs": {
+      "plains": 1,
+      "grassland": 1,
+      "hills": 2,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 1,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.cannon",
+    "name": "Cannon",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 16,
+      "ranged_strength": 26,
+      "range": 2
+    },
+    "cost": {
+      "production": 200
+    },
+    "prereq_tech": "tech.chemistry",
+    "era_required": "renaissance",
+    "evolves_to": "unit.artillery",
+    "upgrade_cost": {
+      "gold": 250
+    },
+    "traits": [
+      "siege",
+      "ranged"
+    ],
+    "terrain_costs": {
+      "plains": 1,
+      "grassland": 1,
+      "hills": 2,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 1,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.artillery",
+    "name": "Artillery",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 32,
+      "ranged_strength": 41,
+      "range": 3
+    },
+    "cost": {
+      "production": 350
+    },
+    "prereq_tech": "tech.dynamite",
+    "era_required": "industrial",
+    "traits": [
+      "siege",
+      "ranged"
+    ],
+    "terrain_costs": {
+      "plains": 1,
+      "grassland": 1,
+      "hills": 2,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 1,
+      "snow": 1.5
+    }
+  }
+]

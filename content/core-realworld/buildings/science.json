@@ -1,0 +1,38 @@
+[
+  {
+    "id": "building.university",
+    "name": "University",
+    "cost": { "production": 200 },
+    "prereq_tech": "tech.education",
+    "era_required": "medieval",
+    "city_yields": { "science": 4 },
+    "maintenance_gold": 2
+  },
+  {
+    "id": "building.observatory",
+    "name": "Observatory",
+    "cost": { "production": 200 },
+    "prereq_tech": "tech.astronomy",
+    "era_required": "renaissance",
+    "city_yields": { "science": 3 },
+    "maintenance_gold": 0
+  },
+  {
+    "id": "building.public_school",
+    "name": "Public School",
+    "cost": { "production": 360 },
+    "prereq_tech": "tech.scientific_theory",
+    "era_required": "industrial",
+    "city_yields": { "science": 5 },
+    "maintenance_gold": 3
+  },
+  {
+    "id": "building.research_lab",
+    "name": "Research Lab",
+    "cost": { "production": 540 },
+    "prereq_tech": "tech.plastics",
+    "era_required": "modern",
+    "city_yields": { "science": 7 },
+    "maintenance_gold": 3
+  }
+]

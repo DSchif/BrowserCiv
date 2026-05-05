@@ -1,0 +1,5 @@
+[
+  { "id": "land", "name": "Land", "layer": 0, "default_passable_by_traits": [] },
+  { "id": "coast", "name": "Coast", "layer": 1, "default_passable_by_traits": ["naval"] },
+  { "id": "ocean", "name": "Ocean", "layer": 1, "default_passable_by_traits": ["naval"] }
+]

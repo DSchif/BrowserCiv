@@ -1,0 +1,93 @@
+[
+  {
+    "id": "tech.astronomy",
+    "tree_id": "tree.realworld",
+    "name": "Astronomy",
+    "era": "renaissance",
+    "cost": 380,
+    "prereqs": ["tech.education", "tech.compass"],
+    "unlocks": {
+      "units": ["unit.caravel"],
+      "buildings": ["building.observatory"]
+    }
+  },
+  {
+    "id": "tech.acoustics",
+    "tree_id": "tree.realworld",
+    "name": "Acoustics",
+    "era": "renaissance",
+    "cost": 380,
+    "prereqs": ["tech.education"],
+    "unlocks": { "buildings": ["building.opera_house"] }
+  },
+  {
+    "id": "tech.banking",
+    "tree_id": "tree.realworld",
+    "name": "Banking",
+    "era": "renaissance",
+    "cost": 380,
+    "prereqs": ["tech.guilds", "tech.education"],
+    "unlocks": { "buildings": ["building.bank"] }
+  },
+  {
+    "id": "tech.printing_press",
+    "tree_id": "tree.realworld",
+    "name": "Printing Press",
+    "era": "renaissance",
+    "cost": 410,
+    "prereqs": ["tech.machinery"]
+  },
+  {
+    "id": "tech.gunpowder",
+    "tree_id": "tree.realworld",
+    "name": "Gunpowder",
+    "era": "renaissance",
+    "cost": 410,
+    "prereqs": ["tech.physics", "tech.steel"],
+    "unlocks": { "units": ["unit.musketman"] }
+  },
+  {
+    "id": "tech.navigation",
+    "tree_id": "tree.realworld",
+    "name": "Navigation",
+    "era": "renaissance",
+    "cost": 410,
+    "prereqs": ["tech.astronomy"],
+    "unlocks": { "units": ["unit.frigate"] }
+  },
+  {
+    "id": "tech.architecture",
+    "tree_id": "tree.realworld",
+    "name": "Architecture",
+    "era": "renaissance",
+    "cost": 440,
+    "prereqs": ["tech.education", "tech.theology"]
+  },
+  {
+    "id": "tech.economics",
+    "tree_id": "tree.realworld",
+    "name": "Economics",
+    "era": "renaissance",
+    "cost": 440,
+    "prereqs": ["tech.banking"],
+    "unlocks": { "buildings": ["building.stock_exchange"] }
+  },
+  {
+    "id": "tech.metallurgy",
+    "tree_id": "tree.realworld",
+    "name": "Metallurgy",
+    "era": "renaissance",
+    "cost": 440,
+    "prereqs": ["tech.gunpowder"],
+    "unlocks": { "units": ["unit.lancer"] }
+  },
+  {
+    "id": "tech.chemistry",
+    "tree_id": "tree.realworld",
+    "name": "Chemistry",
+    "era": "renaissance",
+    "cost": 440,
+    "prereqs": ["tech.gunpowder", "tech.steel"],
+    "unlocks": { "units": ["unit.cannon"] }
+  }
+]

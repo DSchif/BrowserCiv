@@ -1,0 +1,112 @@
+[
+  {
+    "id": "tech.agriculture",
+    "tree_id": "tree.realworld",
+    "name": "Agriculture",
+    "era": "ancient",
+    "cost": 20,
+    "prereqs": []
+  },
+  {
+    "id": "tech.pottery",
+    "tree_id": "tree.realworld",
+    "name": "Pottery",
+    "era": "ancient",
+    "cost": 25,
+    "prereqs": ["tech.agriculture"],
+    "unlocks": { "buildings": ["building.granary", "building.shrine"] }
+  },
+  {
+    "id": "tech.animal_husbandry",
+    "tree_id": "tree.realworld",
+    "name": "Animal Husbandry",
+    "era": "ancient",
+    "cost": 35,
+    "prereqs": ["tech.agriculture"]
+  },
+  {
+    "id": "tech.archery",
+    "tree_id": "tree.realworld",
+    "name": "Archery",
+    "era": "ancient",
+    "cost": 35,
+    "prereqs": ["tech.agriculture"],
+    "unlocks": { "units": ["unit.archer"] }
+  },
+  {
+    "id": "tech.mining",
+    "tree_id": "tree.realworld",
+    "name": "Mining",
+    "era": "ancient",
+    "cost": 35,
+    "prereqs": ["tech.agriculture"]
+  },
+  {
+    "id": "tech.bronze_working",
+    "tree_id": "tree.realworld",
+    "name": "Bronze Working",
+    "era": "ancient",
+    "cost": 55,
+    "prereqs": ["tech.mining"],
+    "unlocks": {
+      "units": ["unit.spearman"],
+      "buildings": ["building.barracks"],
+      "resources_visible": ["resource.iron"]
+    }
+  },
+  {
+    "id": "tech.the_wheel",
+    "tree_id": "tree.realworld",
+    "name": "The Wheel",
+    "era": "ancient",
+    "cost": 55,
+    "prereqs": ["tech.animal_husbandry"],
+    "unlocks": { "units": ["unit.chariot_archer"] }
+  },
+  {
+    "id": "tech.sailing",
+    "tree_id": "tree.realworld",
+    "name": "Sailing",
+    "era": "ancient",
+    "cost": 55,
+    "prereqs": ["tech.pottery"],
+    "unlocks": {
+      "units": ["unit.trireme"],
+      "buildings": ["building.lighthouse"]
+    }
+  },
+  {
+    "id": "tech.calendar",
+    "tree_id": "tree.realworld",
+    "name": "Calendar",
+    "era": "ancient",
+    "cost": 70,
+    "prereqs": ["tech.pottery"]
+  },
+  {
+    "id": "tech.trapping",
+    "tree_id": "tree.realworld",
+    "name": "Trapping",
+    "era": "ancient",
+    "cost": 55,
+    "prereqs": ["tech.animal_husbandry"]
+  },
+  {
+    "id": "tech.masonry",
+    "tree_id": "tree.realworld",
+    "name": "Masonry",
+    "era": "ancient",
+    "cost": 55,
+    "prereqs": ["tech.mining"],
+    "unlocks": { "buildings": ["building.walls"] }
+  },
+  {
+    "id": "tech.writing",
+    "tree_id": "tree.realworld",
+    "name": "Writing",
+    "era": "ancient",
+    "cost": 55,
+    "prereqs": ["tech.pottery"],
+    "unlocks": { "buildings": ["building.library"] }
+  }
+]

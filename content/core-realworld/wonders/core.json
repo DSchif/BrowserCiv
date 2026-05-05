@@ -1,0 +1,52 @@
+[
+  {
+    "id": "wonder.pyramids",
+    "name": "Pyramids",
+    "description": "Workers build improvements 25% faster (cosmetic for now). +1 culture in this city.",
+    "cost": { "production": 185 },
+    "prereq_tech": "tech.masonry",
+    "era_required": "ancient",
+    "city_yields": { "culture": 1, "production": 2 },
+    "empire_yields": {}
+  },
+  {
+    "id": "wonder.hanging_gardens",
+    "name": "Hanging Gardens",
+    "description": "+6 food in this city.",
+    "cost": { "production": 185 },
+    "prereq_tech": "tech.pottery",
+    "era_required": "ancient",
+    "city_yields": { "food": 6 },
+    "empire_yields": {}
+  },
+  {
+    "id": "wonder.stonehenge",
+    "name": "Stonehenge",
+    "description": "+5 culture in the city it's built in.",
+    "cost": { "production": 120 },
+    "prereq_tech": "tech.calendar",
+    "era_required": "ancient",
+    "city_yields": { "culture": 5 },
+    "empire_yields": {}
+  },
+  {
+    "id": "wonder.great_library",
+    "name": "Great Library",
+    "description": "+3 science in this city. +1 science empire-wide.",
+    "cost": { "production": 185 },
+    "prereq_tech": "tech.writing",
+    "era_required": "ancient",
+    "city_yields": { "science": 3 },
+    "empire_yields": { "science": 1 }
+  },
+  {
+    "id": "wonder.colossus",
+    "name": "Colossus",
+    "description": "+5 gold in this city; only buildable in a coastal city.",
+    "cost": { "production": 200 },
+    "prereq_tech": "tech.bronze_working",
+    "era_required": "ancient",
+    "city_yields": { "gold": 5 },
+    "empire_yields": {}
+  }
+]

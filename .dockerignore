@@ -1,0 +1,16 @@
+**/node_modules
+**/dist
+**/build
+**/.turbo
+**/cdk.out
+**/data
+.git
+.github
+*.log
+.env
+.env.*
+/tmp
+packages/infra
+scripts
+SPEC.md
+README.md

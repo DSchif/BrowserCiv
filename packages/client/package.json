@@ -1,0 +1,21 @@
+{
+  "name": "@browserciv/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --port 5173",
+    "test": "echo 'no tests yet'"
+  },
+  "dependencies": {
+    "@browserciv/shared": "workspace:*",
+    "pixi.js": "^8.6.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  }
+}

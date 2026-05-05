@@ -1,0 +1,307 @@
+[
+  {
+    "id": "unit.warrior",
+    "name": "Warrior",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 8
+    },
+    "cost": {
+      "production": 40
+    },
+    "era_required": "ancient",
+    "evolves_to": "unit.swordsman",
+    "upgrade_cost": {
+      "gold": 60
+    },
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.swordsman",
+    "name": "Swordsman",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 14
+    },
+    "cost": {
+      "production": 75,
+      "resources": {
+        "resource.iron": 1
+      }
+    },
+    "prereq_tech": "tech.iron_working",
+    "era_required": "classical",
+    "evolves_to": "unit.longswordsman",
+    "upgrade_cost": {
+      "gold": 90
+    },
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.longswordsman",
+    "name": "Longswordsman",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 21
+    },
+    "cost": {
+      "production": 90,
+      "resources": {
+        "resource.iron": 1
+      }
+    },
+    "prereq_tech": "tech.steel",
+    "era_required": "medieval",
+    "evolves_to": "unit.musketman",
+    "upgrade_cost": {
+      "gold": 150
+    },
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.musketman",
+    "name": "Musketman",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 24
+    },
+    "cost": {
+      "production": 120
+    },
+    "prereq_tech": "tech.gunpowder",
+    "era_required": "renaissance",
+    "evolves_to": "unit.rifleman",
+    "upgrade_cost": {
+      "gold": 200
+    },
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.rifleman",
+    "name": "Rifleman",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 34
+    },
+    "cost": {
+      "production": 200
+    },
+    "prereq_tech": "tech.rifling",
+    "era_required": "industrial",
+    "evolves_to": "unit.great_war_infantry",
+    "upgrade_cost": {
+      "gold": 250
+    },
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.spearman",
+    "name": "Spearman",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 11
+    },
+    "cost": {
+      "production": 50
+    },
+    "prereq_tech": "tech.bronze_working",
+    "era_required": "ancient",
+    "evolves_to": "unit.pikeman",
+    "upgrade_cost": {
+      "gold": 80
+    },
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.pikeman",
+    "name": "Pikeman",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 2,
+    "combat": {
+      "strength": 16
+    },
+    "cost": {
+      "production": 75
+    },
+    "prereq_tech": "tech.civil_service",
+    "era_required": "medieval",
+    "evolves_to": "unit.lancer",
+    "upgrade_cost": {
+      "gold": 120
+    },
+    "traits": [
+      "infantry"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 1,
+      "desert": 1,
+      "mountain": 3,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 1,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  },
+  {
+    "id": "unit.lancer",
+    "name": "Lancer",
+    "domain": "land",
+    "passable_domains": [
+      "land"
+    ],
+    "movement": 4,
+    "combat": {
+      "strength": 22
+    },
+    "cost": {
+      "production": 150
+    },
+    "prereq_tech": "tech.metallurgy",
+    "era_required": "renaissance",
+    "traits": [
+      "mounted"
+    ],
+    "terrain_costs": {
+      "plains": 0.5,
+      "grassland": 0.5,
+      "hills": 1,
+      "forest": 2,
+      "desert": 1,
+      "mountain": 0,
+      "ocean": 0,
+      "deep_ocean": 0,
+      "coast": 0,
+      "jungle": 2,
+      "tundra": 0.5,
+      "snow": 1.5
+    }
+  }
+]

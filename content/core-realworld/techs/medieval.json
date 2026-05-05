@@ -1,0 +1,91 @@
+[
+  {
+    "id": "tech.civil_service",
+    "tree_id": "tree.realworld",
+    "name": "Civil Service",
+    "era": "medieval",
+    "cost": 275,
+    "prereqs": ["tech.trapping", "tech.philosophy"],
+    "unlocks": { "units": ["unit.pikeman"] }
+  },
+  {
+    "id": "tech.guilds",
+    "tree_id": "tree.realworld",
+    "name": "Guilds",
+    "era": "medieval",
+    "cost": 200,
+    "prereqs": ["tech.currency"],
+    "unlocks": { "buildings": ["building.workshop"] }
+  },
+  {
+    "id": "tech.theology",
+    "tree_id": "tree.realworld",
+    "name": "Theology",
+    "era": "medieval",
+    "cost": 250,
+    "prereqs": ["tech.philosophy", "tech.calendar"]
+  },
+  {
+    "id": "tech.education",
+    "tree_id": "tree.realworld",
+    "name": "Education",
+    "era": "medieval",
+    "cost": 275,
+    "prereqs": ["tech.philosophy", "tech.theology"],
+    "unlocks": { "buildings": ["building.university"] }
+  },
+  {
+    "id": "tech.chivalry",
+    "tree_id": "tree.realworld",
+    "name": "Chivalry",
+    "era": "medieval",
+    "cost": 250,
+    "prereqs": ["tech.civil_service", "tech.horseback_riding"],
+    "unlocks": { "units": ["unit.knight"] }
+  },
+  {
+    "id": "tech.machinery",
+    "tree_id": "tree.realworld",
+    "name": "Machinery",
+    "era": "medieval",
+    "cost": 250,
+    "prereqs": ["tech.construction"],
+    "unlocks": { "units": ["unit.crossbowman"] }
+  },
+  {
+    "id": "tech.physics",
+    "tree_id": "tree.realworld",
+    "name": "Physics",
+    "era": "medieval",
+    "cost": 220,
+    "prereqs": ["tech.mathematics"],
+    "unlocks": { "units": ["unit.trebuchet"] }
+  },
+  {
+    "id": "tech.steel",
+    "tree_id": "tree.realworld",
+    "name": "Steel",
+    "era": "medieval",
+    "cost": 275,
+    "prereqs": ["tech.iron_working"],
+    "unlocks": { "units": ["unit.longswordsman"] }
+  },
+  {
+    "id": "tech.compass",
+    "tree_id": "tree.realworld",
+    "name": "Compass",
+    "era": "medieval",
+    "cost": 200,
+    "prereqs": ["tech.optics"],
+    "unlocks": { "units": ["unit.galleass"] }
+  },
+  {
+    "id": "tech.metal_casting",
+    "tree_id": "tree.realworld",
+    "name": "Metal Casting",
+    "era": "medieval",
+    "cost": 275,
+    "prereqs": ["tech.bronze_working"],
+    "unlocks": { "buildings": ["building.forge"] }
+  }
+]

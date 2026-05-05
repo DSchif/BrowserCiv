@@ -1,0 +1,55 @@
+[
+  {
+    "id": "building.granary",
+    "name": "Granary",
+    "cost": { "production": 60 },
+    "prereq_tech": "tech.pottery",
+    "era_required": "ancient",
+    "city_yields": { "food": 2 },
+    "maintenance_gold": 1
+  },
+  {
+    "id": "building.shrine",
+    "name": "Shrine",
+    "cost": { "production": 40 },
+    "prereq_tech": "tech.pottery",
+    "era_required": "ancient",
+    "city_yields": { "culture": 1 },
+    "maintenance_gold": 1
+  },
+  {
+    "id": "building.barracks",
+    "name": "Barracks",
+    "cost": { "production": 75 },
+    "prereq_tech": "tech.bronze_working",
+    "era_required": "ancient",
+    "city_yields": { "production": 1 },
+    "maintenance_gold": 1
+  },
+  {
+    "id": "building.library",
+    "name": "Library",
+    "cost": { "production": 75 },
+    "prereq_tech": "tech.writing",
+    "era_required": "ancient",
+    "city_yields": { "science": 2 },
+    "maintenance_gold": 1
+  },
+  {
+    "id": "building.walls",
+    "name": "Walls",
+    "cost": { "production": 75 },
+    "prereq_tech": "tech.masonry",
+    "era_required": "ancient",
+    "maintenance_gold": 1
+  },
+  {
+    "id": "building.lighthouse",
+    "name": "Lighthouse",
+    "cost": { "production": 75 },
+    "prereq_tech": "tech.sailing",
+    "era_required": "ancient",
+    "city_yields": { "food": 1, "gold": 1 },
+    "maintenance_gold": 1
+  }
+]
