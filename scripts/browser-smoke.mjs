@@ -31,7 +31,7 @@ async function main() {
   await pageA.selectOption("#size", "small");
   await pageA.screenshot({ path: `${SHOT_DIR}/01-lobby-alice.png`, fullPage: true });
   await pageA.click("#create");
-  await pageA.waitForSelector("#hud");
+  await pageA.waitForSelector("#lobby-overlay:not(.hidden)");
   await pageA.waitForTimeout(500);
   await pageA.screenshot({ path: `${SHOT_DIR}/02-match-alice-lobby.png`, fullPage: true });
 
@@ -49,7 +49,7 @@ async function main() {
   await pageB.click("#refresh");
   await pageB.waitForSelector("button.join", { timeout: 5000 });
   await pageB.click("button.join");
-  await pageB.waitForSelector("#hud");
+  await pageB.waitForSelector("#lobby-overlay:not(.hidden)");
   await pageB.waitForTimeout(800);
   await pageA.waitForTimeout(800);
   await pageA.screenshot({ path: `${SHOT_DIR}/03-match-alice-with-bob.png`, fullPage: true });
@@ -58,12 +58,12 @@ async function main() {
   // Wait for #start to be enabled
   await pageA.waitForFunction(
     () => {
-      const btn = document.querySelector("#start");
+      const btn = document.querySelector("#lo-start");
       return btn && !btn.hasAttribute("disabled");
     },
     { timeout: 10000 },
   );
-  await pageA.click("#start");
+  await pageA.click("#lo-start");
   await pageA.waitForTimeout(1500);
   await pageB.waitForTimeout(1500);
   await pageA.screenshot({ path: `${SHOT_DIR}/04-match-started-alice.png`, fullPage: true });
