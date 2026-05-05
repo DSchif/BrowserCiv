@@ -9,6 +9,7 @@ import {
   getCityAttacks,
   diplomacyKey,
   effectivenessMultiplier,
+  getUnitAttacks,
   getUnitTypes,
   resolveCityAttack,
   resolveMelee,
@@ -396,7 +397,7 @@ export function reduce(
       if (cityOnTarget && cityOnTarget.ownerId !== action.actorId && !occupant) {
         const dipKey = diplomacyKey(action.actorId, cityOnTarget.ownerId);
         if (prev.diplomacy[dipKey] !== "war") {
-          throw new GameRuleError("NOT_AT_WAR", "must declare war first");
+          prev = { ...prev, diplomacy: { ...prev.diplomacy, [dipKey]: "war" as const } };
         }
         if (
           Math.abs(unit.position.q - action.target.q) +
@@ -472,11 +473,11 @@ export function reduce(
       // path below (unit takes the hit, not the city — same as Civ V).
 
 
-      // Enemy occupant → this is an attack. Requires war.
+      // Enemy occupant → this is an attack. Auto-declare war (Civ V style).
       if (occupant && occupant.ownerId !== action.actorId) {
         const dipKey = diplomacyKey(action.actorId, occupant.ownerId);
         if (prev.diplomacy[dipKey] !== "war") {
-          throw new GameRuleError("NOT_AT_WAR", "must declare war first");
+          prev = { ...prev, diplomacy: { ...prev.diplomacy, [dipKey]: "war" as const } };
         }
         // Attacker must be adjacent (cost ≤ 1 in unit's terrain table on the target tile).
         if (Math.abs(unit.position.q - action.target.q) + Math.abs(unit.position.r - action.target.r) + Math.abs((-unit.position.q - unit.position.r) - (-action.target.q - action.target.r)) > 2) {
@@ -490,7 +491,7 @@ export function reduce(
         const aDef = unitDef(content, unit.defId);
         let chosen: import("./combat.js").Attack | undefined;
         if (action.attackId && aDef) {
-          chosen = aDef.attacks?.find((a) => a.id === action.attackId);
+          chosen = getUnitAttacks(aDef).find((a) => a.id === action.attackId);
           if (!chosen)
             throw new GameRuleError("NO_SUCH_ATTACK", "attackId not on unit");
           if (chosen.range > 1)
@@ -672,13 +673,14 @@ export function reduce(
         throw new GameRuleError("SELF", "cannot attack own unit");
 
       const dipKey = diplomacyKey(action.actorId, target.ownerId);
-      if (prev.diplomacy[dipKey] !== "war")
-        throw new GameRuleError("NOT_AT_WAR", "must declare war first");
+      if (prev.diplomacy[dipKey] !== "war") {
+        prev = { ...prev, diplomacy: { ...prev.diplomacy, [dipKey]: "war" as const } };
+      }
 
       const def = unitDef(content, attacker.defId);
       // Resolve which attack to use.
       let chosenRanged: import("./combat.js").Attack | undefined;
-      const allAttacks = def?.attacks ?? [];
+      const allAttacks = def ? getUnitAttacks(def) : [];
       if (action.attackId) {
         chosenRanged = allAttacks.find((a) => a.id === action.attackId);
         if (!chosenRanged)

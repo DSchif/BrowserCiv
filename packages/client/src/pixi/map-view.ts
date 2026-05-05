@@ -1,4 +1,4 @@
-import type { City, ContentPack, MapView, MatchView, Player, Unit } from "@browserciv/shared";
+import type { City, ContentPack, MapView, MatchView, PathfindResult, Player, Unit } from "@browserciv/shared";
 import { Hex } from "@browserciv/shared";
 import { Application, Container, Graphics, Text } from "pixi.js";
 
@@ -107,6 +107,7 @@ export class MapViewer {
   reachable: Map<string, number> = new Map();
   selectedUnitId: string | null = null;
   selectedCityId: string | null = null;
+  private attackHighlightCoords: AxialCoord[] = [];
   pack: ContentPack | null = null;
   /** Centered once on the viewer's starting hex; subsequent renders preserve pan/zoom. */
   private hasCentered = false;
@@ -262,33 +263,33 @@ export class MapViewer {
       const { x, y } = Hex.axialToPixel({ q: tile.q, r: tile.r }, HEX_SIZE);
       const dim = tile.visibility === "seen" ? 0.55 : 1;
 
-      // Resource icon (top-left)
+      // Resource icon (center of tile)
       if (tile.resource) {
         const glyph = RESOURCE_GLYPH[tile.resource] ?? "?";
         const t = new Text({
           text: glyph,
           style: {
-            fontSize: 14,
+            fontSize: 16,
             fill: 0xffffff,
             stroke: { color: 0x000000, width: 2 },
             fontFamily: "system-ui",
           },
         });
         t.anchor.set(0.5);
-        t.x = x - HEX_SIZE * 0.55;
-        t.y = y - HEX_SIZE * 0.55;
+        t.x = x;
+        t.y = y;
         t.alpha = dim;
         t.eventMode = "none";
         this.resourceLayer.addChild(t);
       }
 
-      // Improvement icon (top-right)
+      // Improvement icon (bottom-right of tile)
       if (tile.improvement) {
         const glyph = IMPROVEMENT_GLYPH[tile.improvement] ?? "?";
         const t = new Text({
           text: glyph,
           style: {
-            fontSize: 14,
+            fontSize: 13,
             fill: 0xfff200,
             stroke: { color: 0x000000, width: 2 },
             fontFamily: "system-ui",
@@ -296,8 +297,8 @@ export class MapViewer {
           },
         });
         t.anchor.set(0.5);
-        t.x = x + HEX_SIZE * 0.55;
-        t.y = y - HEX_SIZE * 0.55;
+        t.x = x + HEX_SIZE * 0.48;
+        t.y = y + HEX_SIZE * 0.42;
         t.alpha = dim;
         t.eventMode = "none";
         this.resourceLayer.addChild(t);
@@ -342,55 +343,50 @@ export class MapViewer {
     this.renderOverlay();
   }
 
-  /** Set a path to preview (list of axial coords from unit's current pos to target). */
-  setPathPreview(path: AxialCoord[] | null, totalCost: number = 0): void {
+  /**
+   * Preview a movement path. Steps within movementLeft are white (reachable this turn);
+   * steps beyond are yellow (future turns). Pass null to clear.
+   */
+  setPathPreview(
+    result: PathfindResult | null,
+    startCoord: AxialCoord | null,
+    movementLeft: number,
+  ): void {
     this.pathLayer.removeChildren();
-    if (!path || path.length === 0) return;
-    // Draw colored dots at each step + a connecting line.
-    const line = new Graphics();
-    let prev: { x: number; y: number } | null = null;
-    for (const c of path) {
-      const { x, y } = Hex.axialToPixel(c, HEX_SIZE);
-      if (prev) {
-        line.moveTo(prev.x, prev.y);
-        line.lineTo(x, y);
-      }
-      prev = { x, y };
-    }
-    line.stroke({ color: 0xfff200, width: 3, alpha: 0.85 });
-    line.eventMode = "none";
-    this.pathLayer.addChild(line);
+    if (!result || !startCoord || result.steps.length === 0) return;
 
-    for (const c of path) {
-      const { x, y } = Hex.axialToPixel(c, HEX_SIZE);
+    // Build full path: start (cost 0) + each step with its cumulative cost.
+    const path: Array<{ coord: AxialCoord; costSoFar: number }> = [
+      { coord: startCoord, costSoFar: 0 },
+      ...result.steps,
+    ];
+
+    // Draw segment by segment so each can be white or yellow.
+    for (let i = 1; i < path.length; i++) {
+      const thisTurn = path[i]!.costSoFar <= movementLeft;
+      const color = thisTurn ? 0xffffff : 0xfff200;
+      const p0 = Hex.axialToPixel(path[i - 1]!.coord, HEX_SIZE);
+      const p1 = Hex.axialToPixel(path[i]!.coord, HEX_SIZE);
+      const seg = new Graphics();
+      seg.moveTo(p0.x, p0.y).lineTo(p1.x, p1.y);
+      seg.stroke({ color, width: 3, alpha: 0.85 });
+      seg.eventMode = "none";
+      this.pathLayer.addChild(seg);
+
       const dot = new Graphics()
         .circle(0, 0, 5)
-        .fill({ color: 0xfff200, alpha: 0.9 })
-        .stroke({ color: 0x000000, width: 1, alpha: 0.7 });
-      dot.x = x;
-      dot.y = y;
+        .fill({ color, alpha: 0.9 })
+        .stroke({ color: 0x000000, width: 1, alpha: 0.5 });
+      dot.x = p1.x;
+      dot.y = p1.y;
       dot.eventMode = "none";
       this.pathLayer.addChild(dot);
     }
+  }
 
-    // Cost label at endpoint.
-    const last = path[path.length - 1]!;
-    const { x: lx, y: ly } = Hex.axialToPixel(last, HEX_SIZE);
-    const label = new Text({
-      text: `${totalCost} MP`,
-      style: {
-        fontSize: 11,
-        fill: 0xfff200,
-        stroke: { color: 0x000000, width: 2 },
-        fontFamily: "monospace",
-        fontWeight: "bold",
-      },
-    });
-    label.anchor.set(0.5);
-    label.x = lx;
-    label.y = ly + HEX_SIZE * 0.4;
-    label.eventMode = "none";
-    this.pathLayer.addChild(label);
+  setAttackHighlight(coords: AxialCoord[]): void {
+    this.attackHighlightCoords = coords;
+    this.renderOverlay();
   }
 
   setSelectedCity(cityId: string | null): void {
@@ -732,6 +728,8 @@ export class MapViewer {
       bg.eventMode = "static";
       bg.cursor = "pointer";
       bg.on("pointertap", () => this.callbacks.onUnitClick?.(u));
+      bg.on("pointerover", () => this.callbacks.onTileHover?.(u.position));
+      bg.on("pointerout", () => this.callbacks.onTileHover?.(null));
       this.unitLayer.addChild(bg);
 
       const label = new Text({
@@ -763,28 +761,57 @@ export class MapViewer {
         mp.y = y + HEX_SIZE * 0.65;
         this.unitLayer.addChild(mp);
       }
+
+      // Health bar — shown whenever unit has taken damage
+      if (u.hp < u.hpMax) {
+        const barW = HEX_SIZE * 1.1;
+        const pct = Math.max(0, u.hp / u.hpMax);
+        const barColor = pct > 0.6 ? 0x2ea043 : pct > 0.3 ? 0xd29922 : 0xf85149;
+        const bar = new Graphics();
+        bar.rect(-barW / 2, 0, barW, 4).fill({ color: 0x1a0000, alpha: 0.9 });
+        bar.rect(-barW / 2, 0, barW * pct, 4).fill({ color: barColor, alpha: 1 });
+        bar.x = x;
+        bar.y = y - HEX_SIZE * 0.72;
+        bar.eventMode = "none";
+        this.unitLayer.addChild(bar);
+      }
     }
   }
 
   private renderOverlay(): void {
     this.overlayLayer.removeChildren();
-    if (this.reachable.size === 0) return;
-    for (const [k, cost] of this.reachable.entries()) {
-      const [qStr, rStr] = k.split(",");
-      const coord = { q: parseInt(qStr!, 10), r: parseInt(rStr!, 10) };
+
+    // Reachable highlight (white, subtle) — skip when in attack mode
+    if (this.attackHighlightCoords.length === 0) {
+      for (const [k] of this.reachable.entries()) {
+        const [qStr, rStr] = k.split(",");
+        const coord = { q: parseInt(qStr!, 10), r: parseInt(rStr!, 10) };
+        const { x, y } = Hex.axialToPixel(coord, HEX_SIZE);
+        const ring = drawHexFill(HEX_SIZE - 3, 0xffffff, 0.13);
+        ring.x = x;
+        ring.y = y;
+        ring.eventMode = "none";
+        this.overlayLayer.addChild(ring);
+      }
+    }
+
+    // Attack target highlights (red)
+    for (const coord of this.attackHighlightCoords) {
       const { x, y } = Hex.axialToPixel(coord, HEX_SIZE);
-      const ring = drawHexFill(HEX_SIZE - 3, 0xfff200, 0.18);
-      ring.x = x;
-      ring.y = y;
-      this.overlayLayer.addChild(ring);
-      const t = new Text({
-        text: String(cost),
-        style: { fontSize: 9, fill: 0xfff200, fontFamily: "monospace" },
-      });
-      t.anchor.set(0.5);
-      t.x = x;
-      t.y = y - HEX_SIZE + 8;
-      this.overlayLayer.addChild(t);
+      const fill = drawHexFill(HEX_SIZE - 2, 0xff2020, 0.30);
+      fill.x = x;
+      fill.y = y;
+      fill.eventMode = "none";
+      this.overlayLayer.addChild(fill);
+
+      const border = new Graphics();
+      const pts: number[] = [];
+      for (const [vx, vy] of VERTS) pts.push((HEX_SIZE - 2) * vx, (HEX_SIZE - 2) * vy);
+      border.poly(pts).stroke({ color: 0xff4040, width: 2.5, alpha: 0.95 });
+      border.x = x;
+      border.y = y;
+      border.eventMode = "none";
+      this.overlayLayer.addChild(border);
     }
   }
 }

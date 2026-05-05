@@ -2,6 +2,7 @@ import type {
   City,
   ContentPack,
   MatchView,
+  PathfindResult,
   Player,
   ProductionItem,
   Tech,
@@ -20,6 +21,8 @@ import {
   getUnitAttacks,
   Hex,
   reachable as computeReachable,
+  resolveMelee,
+  resolveRanged,
 } from "@browserciv/shared";
 import type { Attack } from "@browserciv/shared";
 import { Application } from "pixi.js";
@@ -39,33 +42,68 @@ export interface MatchSession {
 export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: () => void): void {
   root.innerHTML = `
     <canvas id="game-canvas"></canvas>
-    <div id="hud" class="hud">
-      <div class="hud-row"><strong>Match</strong> <code id="match-id">${session.matchId}</code></div>
-      <div class="hud-row"><strong>You</strong> <span id="me">${escape(session.name)}</span></div>
-      <div class="hud-row"><strong>Status</strong> <span id="status">connecting…</span></div>
-      <div class="hud-row"><strong>Turn</strong> <span id="turn">—</span></div>
-      <div class="hud-row"><strong>To act</strong> <span id="active">—</span></div>
-      <div class="hud-row"><strong>Era</strong> <span id="era">—</span></div>
-      <div class="hud-row"><strong>Treasury</strong> <span id="treasury">—</span></div>
-      <div class="hud-row"><strong>Research</strong> <span id="research">—</span></div>
-      <div class="hud-row"><strong>Resources</strong> <span id="resources">—</span></div>
-      <div class="hud-row"><strong>Selected</strong> <span id="selected">—</span></div>
-      <div id="improvements-row" class="hud-row hidden"><strong>Build</strong> <div id="improvements-list" class="improvements-list"></div></div>
-      <div class="hud-row"><strong>Players</strong></div>
-      <ul id="players"></ul>
-      <div class="hud-row buttons">
-        <button id="start" disabled>Start match</button>
-        <button id="found" disabled>Found city</button>
-        <button id="upgrade" disabled>Upgrade</button>
-        <button id="fortify" disabled>Fortify</button>
-        <button id="tech">Research</button>
-        <button id="diplomacy">Diplomacy</button>
-        <button id="end" disabled>End turn</button>
-        <button id="leave">Leave</button>
+
+    <div id="lobby-overlay" class="lobby-overlay">
+      <div class="lobby-card">
+        <h2>Game Lobby</h2>
+        <p class="lo-subtitle">Share the match ID for others to join</p>
+        <div class="lo-id-box">
+          <code id="lo-match-id">${escape(session.matchId)}</code>
+          <button class="lo-copy" id="lo-copy">Copy</button>
+        </div>
+        <ul class="lo-players" id="lo-players"></ul>
+        <div class="lo-waiting" id="lo-waiting">Waiting for players…</div>
+        <div class="lo-actions">
+          <button class="lo-start" id="lo-start" disabled>Start Match</button>
+          <button class="lo-leave" id="lo-leave-lobby">Leave</button>
+        </div>
       </div>
-      <div class="hud-row"><strong>Log</strong></div>
+    </div>
+
+    <div id="top-bar" class="top-bar">
+      <div class="tb-left">
+        <span id="status-dot" class="status-dot disconnected"></span>
+        <span id="era-badge" class="era-badge">—</span>
+        <code class="match-code">${escape(session.matchId)}</code>
+        <button id="start" class="tb-btn tb-start hidden" disabled>Start match</button>
+      </div>
+      <div class="tb-center">
+        <span id="turn-label" class="tb-dim">connecting…</span>
+        <span id="active-badge" class="active-badge"></span>
+      </div>
+      <div class="tb-right">
+        <button id="science-btn" class="tb-btn tb-science" title="Open tech tree">🔬 <span id="science-rate">—</span></button>
+        <button id="gold-btn" class="tb-btn tb-gold" title="Treasury">💰 <span id="gold-label">—</span></button>
+        <button id="diplomacy-btn" class="tb-btn tb-diplo" title="Diplomacy">⚔</button>
+        <button id="menu-btn" class="tb-btn" title="Menu">☰</button>
+      </div>
+    </div>
+
+    <div id="menu-dropdown" class="menu-dropdown hidden">
+      <button id="toggle-log">Show log</button>
+      <div class="menu-divider"></div>
+      <div id="menu-players" class="menu-players"></div>
+      <div id="menu-res-section"></div>
+      <div class="menu-divider"></div>
+      <button id="leave" class="menu-leave">Leave match</button>
+    </div>
+
+    <div id="log-panel" class="log-panel hidden">
+      <div class="log-header">Event Log</div>
       <ul id="log"></ul>
     </div>
+
+    <div id="tile-info" class="tile-info hidden"></div>
+
+    <div id="action-panel" class="action-panel hidden">
+      <div id="ap-info" class="ap-info"></div>
+      <div id="ap-actions" class="ap-actions"></div>
+    </div>
+
+    <div id="attack-picker" class="attack-picker hidden"></div>
+
+    <button id="end" class="end-turn-btn" disabled>End Turn</button>
+
     <div id="city-panel" class="city-panel hidden">
       <div class="city-panel-header">
         <h2 id="cp-name">—</h2>
@@ -87,28 +125,38 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
       </div>
       <div class="city-panel-body" id="dp-body"></div>
     </div>
-    <div id="attack-picker" class="attack-picker hidden"></div>
-    <div id="tile-info" class="tile-info hidden"></div>
   `;
 
   const canvas = root.querySelector<HTMLCanvasElement>("#game-canvas")!;
-  const statusEl = root.querySelector<HTMLSpanElement>("#status")!;
-  const turnEl = root.querySelector<HTMLSpanElement>("#turn")!;
-  const activeEl = root.querySelector<HTMLSpanElement>("#active")!;
-  const eraEl = root.querySelector<HTMLSpanElement>("#era")!;
-  const treasuryEl = root.querySelector<HTMLSpanElement>("#treasury")!;
-  const researchEl = root.querySelector<HTMLSpanElement>("#research")!;
-  const resourcesEl = root.querySelector<HTMLSpanElement>("#resources")!;
-  const selectedEl = root.querySelector<HTMLSpanElement>("#selected")!;
-  const playersEl = root.querySelector<HTMLUListElement>("#players")!;
+  const lobbyOverlay = root.querySelector<HTMLDivElement>("#lobby-overlay")!;
+  const loPlayers = root.querySelector<HTMLUListElement>("#lo-players")!;
+  const loWaiting = root.querySelector<HTMLDivElement>("#lo-waiting")!;
+  const loStart = root.querySelector<HTMLButtonElement>("#lo-start")!;
+  const loCopy = root.querySelector<HTMLButtonElement>("#lo-copy")!;
+  const loLeaveLobby = root.querySelector<HTMLButtonElement>("#lo-leave-lobby")!;
+  const statusDot = root.querySelector<HTMLSpanElement>("#status-dot")!;
+  const eraBadge = root.querySelector<HTMLSpanElement>("#era-badge")!;
+  const turnLabel = root.querySelector<HTMLSpanElement>("#turn-label")!;
+  const activeBadge = root.querySelector<HTMLSpanElement>("#active-badge")!;
+  const scienceRateEl = root.querySelector<HTMLSpanElement>("#science-rate")!;
+  const goldLabelEl = root.querySelector<HTMLSpanElement>("#gold-label")!;
+  const scienceBtn = root.querySelector<HTMLButtonElement>("#science-btn")!;
+  const diplomacyBtn = root.querySelector<HTMLButtonElement>("#diplomacy-btn")!;
+  const menuBtn = root.querySelector<HTMLButtonElement>("#menu-btn")!;
+  const menuDropdown = root.querySelector<HTMLDivElement>("#menu-dropdown")!;
+  const menuPlayers = root.querySelector<HTMLDivElement>("#menu-players")!;
+  const menuResSection = root.querySelector<HTMLDivElement>("#menu-res-section")!;
+  const toggleLogBtn = root.querySelector<HTMLButtonElement>("#toggle-log")!;
+  const leaveBtn = root.querySelector<HTMLButtonElement>("#leave")!;
+  const logPanel = root.querySelector<HTMLDivElement>("#log-panel")!;
   const logEl = root.querySelector<HTMLUListElement>("#log")!;
   const startBtn = root.querySelector<HTMLButtonElement>("#start")!;
-  const foundBtn = root.querySelector<HTMLButtonElement>("#found")!;
-  const upgradeBtn = root.querySelector<HTMLButtonElement>("#upgrade")!;
-  const fortifyBtn = root.querySelector<HTMLButtonElement>("#fortify")!;
-  const techBtn = root.querySelector<HTMLButtonElement>("#tech")!;
   const endBtn = root.querySelector<HTMLButtonElement>("#end")!;
-  const leaveBtn = root.querySelector<HTMLButtonElement>("#leave")!;
+  const actionPanel = root.querySelector<HTMLDivElement>("#action-panel")!;
+  const apInfo = root.querySelector<HTMLDivElement>("#ap-info")!;
+  const apActions = root.querySelector<HTMLDivElement>("#ap-actions")!;
+  const attackPickerEl = root.querySelector<HTMLDivElement>("#attack-picker")!;
+  const tileInfo = root.querySelector<HTMLDivElement>("#tile-info")!;
   const cityPanel = root.querySelector<HTMLDivElement>("#city-panel")!;
   const cpName = root.querySelector<HTMLHeadingElement>("#cp-name")!;
   const cpBody = root.querySelector<HTMLDivElement>("#cp-body")!;
@@ -116,22 +164,18 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
   const techPanel = root.querySelector<HTMLDivElement>("#tech-panel")!;
   const tpBody = root.querySelector<HTMLDivElement>("#tp-body")!;
   const tpClose = root.querySelector<HTMLButtonElement>("#tp-close")!;
-  const diplomacyBtn = root.querySelector<HTMLButtonElement>("#diplomacy")!;
   const diploPanel = root.querySelector<HTMLDivElement>("#diplo-panel")!;
   const dpBody = root.querySelector<HTMLDivElement>("#dp-body")!;
   const dpClose = root.querySelector<HTMLButtonElement>("#dp-close")!;
-  const improvementsRow = root.querySelector<HTMLDivElement>("#improvements-row")!;
-  const improvementsList = root.querySelector<HTMLDivElement>("#improvements-list")!;
-  const attackPicker = root.querySelector<HTMLDivElement>("#attack-picker")!;
-  const tileInfo = root.querySelector<HTMLDivElement>("#tile-info")!;
 
+  let logVisible = false;
   let mapView: MapViewer | null = null;
   let latest: MatchView | null = null;
   let pack: ContentPack | null = null;
   let selectedUnitId: string | null = null;
   let selectedCityId: string | null = null;
+  let attackMode: { attack: Attack; unitId: string; fire: (targetUnitId: string) => void } | null = null;
 
-  // Fetch content pack so the UI knows the real units/buildings/techs.
   void fetchContentPack().then((p) => {
     pack = p;
     mapView?.setPack(p);
@@ -153,14 +197,25 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     });
 
   const client = new GameClient(session.matchId, session.playerId, session.token, {
-    onOpen: () => (statusEl.textContent = "connected"),
-    onClose: () => (statusEl.textContent = "disconnected"),
-    onError: (code, msg) => (statusEl.textContent = `error: ${code} — ${msg}`),
+    onOpen: () => {
+      statusDot.classList.remove("disconnected");
+      statusDot.title = "connected";
+    },
+    onClose: () => {
+      statusDot.classList.add("disconnected");
+      statusDot.title = "disconnected";
+    },
+    onError: (code, msg) => {
+      statusDot.classList.add("disconnected");
+      statusDot.title = `error: ${code} — ${msg}`;
+    },
     onState: (state) => {
       latest = state as unknown as MatchView;
       renderState(latest);
     },
-    onReject: (_seq, code, msg) => (statusEl.textContent = `rejected: ${code} — ${msg}`),
+    onReject: (_seq, code, msg) => {
+      statusDot.title = `rejected: ${code} — ${msg}`;
+    },
     onAck: () => undefined,
   });
   client.connect();
@@ -177,66 +232,151 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
         selectedCityId = null;
         mapView?.setSelectedCity(null);
         updateReachable();
-        updateSelectedLabel();
-        updateFoundButton();
-        updateUpgradeButton();
+        updateActionPanel();
       },
     };
   }
 
+  // ── Event listeners ──
+
+  loStart.addEventListener("click", () => {
+    client.sendIntent({ type: "MatchStart", actorId: session.playerId });
+  });
+  loLeaveLobby.addEventListener("click", () => {
+    client.close();
+    onLeave();
+  });
+  loCopy.addEventListener("click", () => {
+    void navigator.clipboard.writeText(session.matchId).then(() => {
+      loCopy.textContent = "Copied!";
+      setTimeout(() => { loCopy.textContent = "Copy"; }, 1500);
+    });
+  });
+
   startBtn.addEventListener("click", () => {
     client.sendIntent({ type: "MatchStart", actorId: session.playerId });
   });
+
   endBtn.addEventListener("click", () => {
     selectedUnitId = null;
+    selectedCityId = null;
+    mapView?.setSelectedCity(null);
+    mapView?.setReachable(new Map(), null);
     closeCityPanel();
     closeTechPanel();
+    hideAttackPicker();
+    actionPanel.classList.add("hidden");
     client.sendIntent({ type: "EndTurn", actorId: session.playerId });
   });
-  foundBtn.addEventListener("click", () => {
-    if (!selectedUnitId) return;
-    client.sendIntent({
-      type: "FoundCity",
-      actorId: session.playerId,
-      unitId: selectedUnitId,
-    });
-    selectedUnitId = null;
-  });
-  upgradeBtn.addEventListener("click", () => {
-    if (!selectedUnitId) return;
-    client.sendIntent({
-      type: "UpgradeUnit",
-      actorId: session.playerId,
-      unitId: selectedUnitId,
-    });
-  });
-  fortifyBtn.addEventListener("click", () => {
-    if (!selectedUnitId) return;
-    client.sendIntent({
-      type: "Fortify",
-      actorId: session.playerId,
-      unitId: selectedUnitId,
-    });
-  });
-  techBtn.addEventListener("click", () => {
+
+  scienceBtn.addEventListener("click", () => {
     if (techPanel.classList.contains("hidden")) openTechPanel();
     else closeTechPanel();
+    menuDropdown.classList.add("hidden");
   });
+
+  diplomacyBtn.addEventListener("click", () => {
+    if (diploPanel.classList.contains("hidden")) openDiploPanel();
+    else closeDiploPanel();
+    menuDropdown.classList.add("hidden");
+  });
+
+  menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menuDropdown.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (
+      !menuDropdown.classList.contains("hidden") &&
+      !menuBtn.contains(e.target as Node) &&
+      !menuDropdown.contains(e.target as Node)
+    ) {
+      menuDropdown.classList.add("hidden");
+    }
+  });
+
+  toggleLogBtn.addEventListener("click", () => {
+    logVisible = !logVisible;
+    logPanel.classList.toggle("hidden", !logVisible);
+    toggleLogBtn.textContent = logVisible ? "Hide log" : "Show log";
+    menuDropdown.classList.add("hidden");
+  });
+
   leaveBtn.addEventListener("click", () => {
     client.close();
     onLeave();
   });
+
   cpClose.addEventListener("click", () => closeCityPanel());
   tpClose.addEventListener("click", () => closeTechPanel());
   dpClose.addEventListener("click", () => closeDiploPanel());
-  diplomacyBtn.addEventListener("click", () => {
-    if (diploPanel.classList.contains("hidden")) openDiploPanel();
-    else closeDiploPanel();
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (attackMode) { clearAttackMode(); return; }
+      hideAttackPicker();
+      closeCityPanel();
+    }
   });
 
+  // ── Attack mode ──
+
+  function enterAttackMode(attack: Attack, unitId: string): void {
+    if (!latest) return;
+    const unit = latest.units.find((u) => u.id === unitId);
+    if (!unit) return;
+
+    const fire = (targetUnitId: string): void => {
+      const target = latest?.units.find((u) => u.id === targetUnitId);
+      if (!target) return;
+      if (attack.range === 1) {
+        client.sendIntent({
+          type: "MoveUnit",
+          actorId: session.playerId,
+          unitId,
+          target: { q: target.position.q, r: target.position.r },
+          attackId: attack.id,
+        });
+      } else {
+        client.sendIntent({
+          type: "RangedAttack",
+          actorId: session.playerId,
+          unitId,
+          targetUnitId,
+          attackId: attack.id,
+        });
+      }
+      clearAttackMode();
+    };
+
+    attackMode = { attack, unitId, fire };
+
+    // Highlight all map tiles within attack range (not just occupied ones)
+    const inRange = (latest.map?.tiles ?? [])
+      .filter((t) => {
+        const dist = Hex.distance(unit.position, { q: t.q, r: t.r });
+        return dist >= 1 && dist <= attack.range;
+      })
+      .map((t) => ({ q: t.q, r: t.r }));
+
+    mapView?.setAttackHighlight(inRange);
+    mapView?.setReachable(new Map(), null); // clear movement overlay while targeting
+    updateActionPanel();
+  }
+
+  function clearAttackMode(): void {
+    attackMode = null;
+    mapView?.setAttackHighlight([]);
+    updateReachable();
+    updateActionPanel();
+  }
+
+  // ── Attack picker (multi-attack chooser) ──
+
   function hideAttackPicker(): void {
-    attackPicker.classList.add("hidden");
-    attackPicker.innerHTML = "";
+    attackPickerEl.classList.add("hidden");
+    attackPickerEl.innerHTML = "";
   }
 
   function showAttackPicker(
@@ -244,7 +384,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     options: Array<{ attack: Attack; onPick: () => void }>,
   ): void {
     void target;
-    attackPicker.innerHTML = `<div class="ap-title">Choose attack</div>`;
+    attackPickerEl.innerHTML = `<div class="ap-title">Choose attack</div>`;
     for (const opt of options) {
       const btn = document.createElement("button");
       btn.className = "ap-btn";
@@ -256,14 +396,14 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
         hideAttackPicker();
         opt.onPick();
       });
-      attackPicker.appendChild(btn);
+      attackPickerEl.appendChild(btn);
     }
     const cancel = document.createElement("button");
     cancel.className = "ap-cancel";
     cancel.textContent = "cancel";
     cancel.addEventListener("click", () => hideAttackPicker());
-    attackPicker.appendChild(cancel);
-    attackPicker.classList.remove("hidden");
+    attackPickerEl.appendChild(cancel);
+    attackPickerEl.classList.remove("hidden");
   }
 
   function unitAvailableAttacks(unit: Unit, range: "melee" | "ranged"): Attack[] {
@@ -283,10 +423,74 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     });
   }
 
+  // ── Map interaction ──
+
+  function triggerAttackEnemy(enemy: Unit): void {
+    if (!latest || !selectedUnitId) return;
+    const me = latest.units.find((u) => u.id === selectedUnitId);
+    if (!me) return;
+    const dq = me.position.q - enemy.position.q;
+    const dr = me.position.r - enemy.position.r;
+    const ds = -dq - dr;
+    const dist = Math.max(Math.abs(dq), Math.abs(dr), Math.abs(ds));
+    const meleeOpts = dist <= 1 ? unitAvailableAttacks(me, "melee") : [];
+    const rangedOpts = unitAvailableAttacks(me, "ranged").filter((a) => a.range >= dist);
+    const all = [...meleeOpts, ...rangedOpts];
+
+    const fireMelee = (attackId?: string): void => {
+      client.sendIntent({
+        type: "MoveUnit",
+        actorId: session.playerId,
+        unitId: selectedUnitId!,
+        target: { q: enemy.position.q, r: enemy.position.r },
+        attackId,
+      });
+    };
+    const fireRanged = (attackId?: string): void => {
+      client.sendIntent({
+        type: "RangedAttack",
+        actorId: session.playerId,
+        unitId: selectedUnitId!,
+        targetUnitId: enemy.id,
+        attackId,
+      });
+    };
+
+    if (all.length === 0) {
+      const myDef = pack?.units.find((d) => (d.id as unknown as string) === me.defId);
+      const range = myDef?.combat.range ?? 0;
+      if (range > 0 && dist <= range) fireRanged();
+      else fireMelee();
+      return;
+    }
+    if (all.length === 1) {
+      const a = all[0]!;
+      if (a.range === 1) fireMelee(a.id);
+      else fireRanged(a.id);
+      return;
+    }
+    showAttackPicker(
+      enemy,
+      all.map((a) => ({
+        attack: a,
+        onPick: () => (a.range === 1 ? fireMelee(a.id) : fireRanged(a.id)),
+      })),
+    );
+  }
+
   function onUnitClick(unit: Unit): void {
     if (!latest || !latest.map) return;
+
+    // Attack mode: clicking any enemy unit fires the queued attack
+    if (attackMode && unit.ownerId !== session.playerId) {
+      attackMode.fire(unit.id);
+      return;
+    }
+    if (attackMode) { clearAttackMode(); return; }
+
     const isMyTurn =
       latest.players[latest.currentPlayerIndex]?.id === session.playerId;
+
     // Clicking my own ship while a friendly land unit is selected and adjacent = board
     if (unit.ownerId === session.playerId && selectedUnitId && unit.id !== selectedUnitId && isMyTurn) {
       const me = latest.units.find((u) => u.id === selectedUnitId);
@@ -311,7 +515,8 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
         }
       }
     }
-    // Clicking an enemy unit while my own city is selected = bombard
+
+    // Enemy unit + my city selected = city bombard
     if (unit.ownerId !== session.playerId && selectedCityId && isMyTurn) {
       const myCity = latest.cities.find((c) => c.id === selectedCityId);
       if (!myCity || !pack) return;
@@ -331,69 +536,18 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
           attackId,
         });
       };
-      if (usable.length === 1) {
-        fire(usable[0]!.id);
-      } else {
-        showAttackPicker(
-          unit,
-          usable.map((a) => ({ attack: a, onPick: () => fire(a.id) })),
-        );
-      }
+      if (usable.length === 1) fire(usable[0]!.id);
+      else showAttackPicker(unit, usable.map((a) => ({ attack: a, onPick: () => fire(a.id) })));
       return;
     }
-    // Clicking an enemy unit while my own is selected = attack
+
+    // Enemy unit + my unit selected = attack
     if (unit.ownerId !== session.playerId) {
       if (!isMyTurn || !selectedUnitId) return;
-      const me = latest.units.find((u) => u.id === selectedUnitId);
-      if (!me) return;
-      const dq = me.position.q - unit.position.q;
-      const dr = me.position.r - unit.position.r;
-      const ds = -dq - dr;
-      const dist = Math.max(Math.abs(dq), Math.abs(dr), Math.abs(ds));
-      const meleeOpts = dist <= 1 ? unitAvailableAttacks(me, "melee") : [];
-      const rangedOpts = unitAvailableAttacks(me, "ranged").filter((a) => a.range >= dist);
-      const all = [...meleeOpts, ...rangedOpts];
-      const fireMelee = (attackId?: string): void => {
-        client.sendIntent({
-          type: "MoveUnit",
-          actorId: session.playerId,
-          unitId: selectedUnitId!,
-          target: { q: unit.position.q, r: unit.position.r },
-          attackId,
-        });
-      };
-      const fireRanged = (attackId?: string): void => {
-        client.sendIntent({
-          type: "RangedAttack",
-          actorId: session.playerId,
-          unitId: selectedUnitId!,
-          targetUnitId: unit.id,
-          attackId,
-        });
-      };
-      if (all.length === 0) {
-        // Fallback: legacy behavior — melee if adjacent, ranged if def has range
-        const myDef = pack?.units.find((d) => (d.id as unknown as string) === me.defId);
-        const range = myDef?.combat.range ?? 0;
-        if (range > 0 && dist <= range) fireRanged();
-        else fireMelee();
-        return;
-      }
-      if (all.length === 1) {
-        const a = all[0]!;
-        if (a.range === 1) fireMelee(a.id);
-        else fireRanged(a.id);
-        return;
-      }
-      showAttackPicker(
-        unit,
-        all.map((a) => ({
-          attack: a,
-          onPick: () => (a.range === 1 ? fireMelee(a.id) : fireRanged(a.id)),
-        })),
-      );
+      triggerAttackEnemy(unit);
       return;
     }
+
     if (!isMyTurn) return;
     selectedUnitId = unit.id;
     selectedCityId = null;
@@ -401,16 +555,44 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     closeCityPanel();
     hideAttackPicker();
     updateReachable();
-    updateSelectedLabel();
-    updateFoundButton();
-    updateUpgradeButton();
-    updateImprovementsRow();
+    updateActionPanel();
   }
 
   function onTileClick(coord: AxialCoord): void {
-    if (!selectedUnitId || !latest) return;
-    // If selected unit is a transport with cargo, clicking adjacent passable
-    // land tile triggers a disembark of the first onboard unit.
+    if (!latest) return;
+
+    // Attack mode: resolve against enemy on tile, or cancel
+    if (attackMode) {
+      const enemyOnTile = latest.units.find(
+        (u) =>
+          u.ownerId !== session.playerId &&
+          u.position.q === coord.q &&
+          u.position.r === coord.r,
+      );
+      if (enemyOnTile) attackMode.fire(enemyOnTile.id);
+      else clearAttackMode();
+      return;
+    }
+
+    const isMyTurn = latest.players[latest.currentPlayerIndex]?.id === session.playerId;
+
+    // If a unit is selected, check for an enemy on the clicked tile first
+    if (isMyTurn && selectedUnitId) {
+      const enemyOnTile = latest.units.find(
+        (u) =>
+          u.ownerId !== session.playerId &&
+          u.position.q === coord.q &&
+          u.position.r === coord.r,
+      );
+      if (enemyOnTile) {
+        triggerAttackEnemy(enemyOnTile);
+        return;
+      }
+    }
+
+    if (!selectedUnitId) return;
+
+    // Transport with cargo: adjacent land tile = disembark
     const selected = latest.units.find((u) => u.id === selectedUnitId);
     if (selected && pack) {
       const cargo = latest.units.filter((u) => u.boardedOn === selected.id);
@@ -439,6 +621,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
         }
       }
     }
+
     client.sendIntent({
       type: "MoveUnit",
       actorId: session.playerId,
@@ -450,34 +633,60 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
   function onTileHover(coord: AxialCoord | null): void {
     if (!mapView || !latest || !latest.map || !pack) return;
     updateTileInfo(coord);
+
+    // Damage preview when targeting
+    if (attackMode && coord) {
+      const attacker = latest.units.find((u) => u.id === attackMode!.unitId);
+      const enemy = latest.units.find(
+        (u) => u.position.q === coord.q && u.position.r === coord.r && u.ownerId !== session.playerId,
+      );
+      if (attacker && enemy) {
+        const result = attackMode.attack.range === 1
+          ? resolveMelee(attacker, enemy, pack, attackMode.attack)
+          : resolveRanged(attacker, enemy, pack, attackMode.attack);
+        const effPct = Math.round((result.effectiveness - 1) * 100);
+        const effStr = effPct === 0 ? "" : effPct > 0 ? ` +${effPct}%` : ` ${effPct}%`;
+        const dmgTo = `<span style="color:#ff7b72">-${result.defenderDamage} to them</span>`;
+        const dmgFrom = result.attackerDamage > 0
+          ? ` <span style="color:#ffb347">-${result.attackerDamage} to you</span>`
+          : "";
+        tileInfo.innerHTML +=
+          `<div class="ti-row" style="margin-top:4px;border-top:1px solid #444;padding-top:4px">` +
+          `<strong>${escape(attackMode.attack.name)}</strong> ` +
+          `<span class="dim">base ${attackMode.attack.damage}${effStr}</span>` +
+          `</div>` +
+          `<div class="ti-row">${dmgTo}${dmgFrom}</div>`;
+        tileInfo.classList.remove("hidden");
+      }
+      mapView.setPathPreview(null, null, 0);
+      return;
+    }
+
     if (!selectedUnitId || !coord) {
-      mapView.setPathPreview(null);
+      mapView.setPathPreview(null, null, 0);
       return;
     }
     const unit = latest.units.find((u) => u.id === selectedUnitId);
-    if (!unit) {
-      mapView.setPathPreview(null);
-      return;
-    }
+    if (!unit) { mapView.setPathPreview(null, null, 0); return; }
     const def = pack.units.find((d) => (d.id as unknown as string) === unit.defId);
-    if (!def) {
-      mapView.setPathPreview(null);
-      return;
-    }
+    if (!def) { mapView.setPathPreview(null, null, 0); return; }
     if (unit.position.q === coord.q && unit.position.r === coord.r) {
-      mapView.setPathPreview(null);
+      mapView.setPathPreview(null, null, 0);
       return;
     }
-    const result = computeFindPath(latest.map, unit.position, coord, pack, {
+
+    // Only pathfind through explored (visible + seen) tiles — not truly unknown territory
+    const filteredMap = {
+      ...latest.map,
+      tiles: latest.map.tiles.filter((t) => t.visibility !== "unseen"),
+    };
+
+    const result = computeFindPath(filteredMap, unit.position, coord, pack, {
       unitTerrainCosts: def.terrain_costs as Record<string, number>,
       unitTraits: def.traits.map((t) => t as unknown as string),
     });
-    if (!result) {
-      mapView.setPathPreview(null);
-      return;
-    }
-    const path: AxialCoord[] = [unit.position, ...result.steps.map((s) => s.coord)];
-    mapView.setPathPreview(path, result.totalCost);
+
+    mapView.setPathPreview(result, unit.position, unit.movementLeft);
   }
 
   function onCityClick(city: City): void {
@@ -487,11 +696,10 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     mapView?.setSelectedCity(city.id);
     mapView?.setReachable(new Map(), null);
     openCityPanel(city);
-    updateSelectedLabel();
-    updateFoundButton();
-    updateUpgradeButton();
-    updateImprovementsRow();
+    updateActionPanel();
   }
+
+  // ── Tile info ──
 
   function updateTileInfo(coord: AxialCoord | null): void {
     if (!coord || !latest || !latest.map || !pack) {
@@ -499,10 +707,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
       return;
     }
     const tile = latest.map.tiles.find((t) => t.q === coord.q && t.r === coord.r);
-    if (!tile) {
-      tileInfo.classList.add("hidden");
-      return;
-    }
+    if (!tile) { tileInfo.classList.add("hidden"); return; }
     const terrain = pack.terrains.find((t) => (t.id as unknown as string) === tile.terrain);
     const resource = tile.resource
       ? pack.resources.find((r) => (r.id as unknown as string) === tile.resource)
@@ -518,7 +723,9 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     }
     if (resource) {
       const required = (resource.harvested_by ?? []).map((i) => i as unknown as string);
-      const harvested = required.length === 0 || (tile.improvement !== undefined && required.includes(tile.improvement));
+      const harvested =
+        required.length === 0 ||
+        (tile.improvement !== undefined && required.includes(tile.improvement));
       if (harvested) {
         for (const [k, v] of Object.entries(resource.yields ?? {})) {
           yieldsObj[k] = (yieldsObj[k] ?? 0) + (v as number);
@@ -544,7 +751,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
           const tag = harvested
             ? '<span class="ti-tag ok">harvested</span>'
             : '<span class="ti-tag warn">needs improvement</span>';
-          return `<div class="ti-row"><strong>${escape(resource.name)}</strong> ${tag}</div>`;
+          return `<div class="ti-row"><strong>${escape(resource.name)}</strong>${tag}</div>`;
         })()
       : "";
     const impLine = improvement
@@ -559,27 +766,26 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     tileInfo.classList.remove("hidden");
   }
 
+  // ── Panel open/close ──
+
   function openCityPanel(city: City): void {
     cityPanel.classList.remove("hidden");
     cpName.textContent = city.name;
     renderCityBody(city);
   }
-
   function closeCityPanel(): void {
     cityPanel.classList.add("hidden");
     selectedCityId = null;
     mapView?.setSelectedCity(null);
+    updateActionPanel();
   }
-
   function openTechPanel(): void {
     techPanel.classList.remove("hidden");
     renderTechBody();
   }
-
   function closeTechPanel(): void {
     techPanel.classList.add("hidden");
   }
-
   function openDiploPanel(): void {
     diploPanel.classList.remove("hidden");
     renderDiploBody();
@@ -587,6 +793,190 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
   function closeDiploPanel(): void {
     diploPanel.classList.add("hidden");
   }
+
+  // ── Action panel ──
+
+  function updateActionPanel(): void {
+    if (!latest) { actionPanel.classList.add("hidden"); return; }
+    const isMyTurn = latest.players[latest.currentPlayerIndex]?.id === session.playerId;
+    const inProgress = latest.status === "in_progress";
+
+    // Attack mode banner
+    if (attackMode) {
+      const rangeLabel = attackMode.attack.range === 1 ? "adjacent enemy" : `enemy within ${attackMode.attack.range} tiles`;
+      apInfo.innerHTML = `<span class="ap-unit-name" style="color:#ff6060">🎯 Targeting: ${escape(attackMode.attack.name)}</span>`;
+      apActions.innerHTML = `
+        <span class="ap-hint">Click a red-highlighted ${rangeLabel} to strike</span>
+        <button id="ap-cancel-attack" style="background:#3a1010;border-color:#f85149;color:#ff7b72">Cancel (Esc)</button>
+      `;
+      apActions.querySelector("#ap-cancel-attack")?.addEventListener("click", () => clearAttackMode());
+      actionPanel.classList.remove("hidden");
+      return;
+    }
+
+    // Unit selected
+    if (selectedUnitId) {
+      const unit = latest.units.find((u) => u.id === selectedUnitId);
+      if (!unit) { actionPanel.classList.add("hidden"); return; }
+
+      const name = unitName(unit.defId);
+      const mpPct = unit.movementMax > 0 ? unit.movementLeft / unit.movementMax : 0;
+      const mpClass = mpPct === 1 ? "mp-full" : mpPct > 0 ? "mp-low" : "mp-none";
+      const cargo = latest.units.filter((u) => u.boardedOn === unit.id);
+      const cargoStr = cargo.length > 0
+        ? ` · cargo: ${cargo.map((c) => unitName(c.defId)).join(", ")}`
+        : "";
+      const boardedStr = unit.boardedOn ? " · onboard" : "";
+
+      apInfo.innerHTML = `
+        <span class="ap-unit-name">${escape(name)}</span>
+        <span class="ap-stat ${mpClass}">${unit.movementLeft}/${unit.movementMax} MP</span>
+        <span class="ap-stat">${unit.hp}/${unit.hpMax} HP</span>
+        ${cargoStr ? `<span class="ap-stat">${escape(cargoStr)}</span>` : ""}
+        ${boardedStr ? `<span class="ap-stat">onboard ship</span>` : ""}
+      `;
+
+      const def = pack?.units.find((d) => (d.id as unknown as string) === unit.defId);
+      const me = latest.players.find((p) => p.id === session.playerId);
+      const buttons: string[] = [];
+
+      if (inProgress && isMyTurn) {
+        // Found city — settler only
+        if (unit.defId === "unit.settler") {
+          const stateLike = { cities: latest.cities } as never;
+          const canFound = canFoundCityAt(stateLike, unit.position);
+          buttons.push(`<button id="ap-found" class="ap-primary" ${canFound ? "" : "disabled"}>Found City</button>`);
+        }
+
+        // Upgrade
+        if (def?.evolves_to && me && pack) {
+          const newDef = pack.units.find(
+            (u) => (u.id as unknown as string) === (def.evolves_to as unknown as string),
+          );
+          if (newDef) {
+            const cost = def.upgrade_cost.gold ?? 0;
+            const techOk =
+              !newDef.prereq_tech ||
+              me.researchedTechs.includes(newDef.prereq_tech as unknown as string);
+            const goldOk = me.gold >= cost;
+            buttons.push(
+              `<button id="ap-upgrade" class="ap-yellow" ${techOk && goldOk ? "" : "disabled"}>Upgrade → ${escape(newDef.name)} (${cost}g)</button>`,
+            );
+          }
+        }
+
+        // Available attack buttons
+        if (def && pack) {
+          const allAttacks = getUnitAttacks(def);
+          for (const atk of allAttacks) {
+            const cd = unit.attackCooldowns?.[atk.id] ?? 0;
+            const used = atk.charges !== undefined ? (unit.attackChargesUsed?.[atk.id] ?? 0) : 0;
+            const exhausted = cd > 0 || (atk.charges !== undefined && used >= atk.charges);
+            const rangeLabel = atk.range === 1 ? "adj" : `r${atk.range}`;
+            if (exhausted) {
+              buttons.push(`<button class="ap-attack-btn" disabled>⚔ ${escape(atk.name)} — used</button>`);
+            } else {
+              buttons.push(`<button class="ap-attack-btn" data-attack-id="${atk.id}">⚔ ${escape(atk.name)} <span style="opacity:.65">${atk.damage}dmg ${rangeLabel}</span></button>`);
+            }
+          }
+        }
+
+        // Fortify
+        buttons.push(`<button id="ap-fortify">Fortify</button>`);
+
+        // Worker improvements
+        const isWorker = def?.traits.some((t) => (t as unknown as string) === "worker");
+        if (isWorker && pack && me) {
+          const tile = latest.map?.tiles.find(
+            (t) => t.q === unit.position.q && t.r === unit.position.r,
+          );
+          if (tile) {
+            if (tile.improvement) {
+              buttons.push(`<span class="ap-hint">${escape(improvementName(tile.improvement))} built</span>`);
+            } else if (tile.workInProgress) {
+              buttons.push(`<span class="ap-hint">building (${tile.workInProgress.turnsLeft}t left)</span>`);
+            } else {
+              const opts = buildableImprovementsForTile(pack, me, tile);
+              for (const imp of opts) {
+                buttons.push(
+                  `<button data-imp="${imp.id}" class="ap-imp">${escape(imp.name)} <span style="opacity:.65">${imp.build_turns}t</span></button>`,
+                );
+              }
+            }
+          }
+        }
+      } else if (inProgress && !isMyTurn) {
+        buttons.push(`<span class="ap-hint">waiting for your turn</span>`);
+      }
+
+      apActions.innerHTML = buttons.join("");
+
+      apActions.querySelector<HTMLButtonElement>("#ap-found")?.addEventListener("click", () => {
+        client.sendIntent({
+          type: "FoundCity",
+          actorId: session.playerId,
+          unitId: selectedUnitId!,
+        });
+        selectedUnitId = null;
+        updateActionPanel();
+      });
+      apActions.querySelector<HTMLButtonElement>("#ap-upgrade")?.addEventListener("click", () => {
+        client.sendIntent({ type: "UpgradeUnit", actorId: session.playerId, unitId: selectedUnitId! });
+      });
+      apActions.querySelector<HTMLButtonElement>("#ap-fortify")?.addEventListener("click", () => {
+        client.sendIntent({ type: "Fortify", actorId: session.playerId, unitId: selectedUnitId! });
+      });
+      apActions.querySelectorAll<HTMLButtonElement>("button[data-imp]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          client.sendIntent({
+            type: "BuildImprovement",
+            actorId: session.playerId,
+            unitId: selectedUnitId!,
+            improvementId: btn.dataset.imp!,
+          });
+        });
+      });
+      apActions.querySelectorAll<HTMLButtonElement>(".ap-attack-btn[data-attack-id]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (!def || !pack) return;
+          const atk = getUnitAttacks(def).find((a) => a.id === btn.dataset.attackId);
+          if (atk) enterAttackMode(atk, selectedUnitId!);
+        });
+      });
+
+      actionPanel.classList.remove("hidden");
+      return;
+    }
+
+    // City selected — show hint for bombard
+    if (selectedCityId) {
+      const city = latest.cities.find((c) => c.id === selectedCityId);
+      if (!city) { actionPanel.classList.add("hidden"); return; }
+      const yields = city.perTurnYields;
+      const yieldStr = (["food", "production", "gold", "science", "culture"] as const)
+        .map((k) => (yields[k] ? `+${yields[k]}${k[0]!.toUpperCase()}` : ""))
+        .filter(Boolean)
+        .join(" ");
+      apInfo.innerHTML = `
+        <span class="ap-unit-name">📍 ${escape(city.name)}</span>
+        <span class="ap-stat">${city.population} pop · HP ${city.hp}/${city.hpMax}</span>
+        ${yieldStr ? `<span class="ap-stat">${yieldStr}/t</span>` : ""}
+      `;
+      const canBombard = !city.hasFiredThisTurn && isMyTurn && inProgress;
+      apActions.innerHTML = canBombard
+        ? `<span class="ap-hint">Bombard: click an enemy unit within range</span>`
+        : city.hasFiredThisTurn
+          ? `<span class="ap-hint" style="color:#6e7681">Bombard used this turn</span>`
+          : "";
+      actionPanel.classList.remove("hidden");
+      return;
+    }
+
+    actionPanel.classList.add("hidden");
+  }
+
+  // ── Diplo / city / tech panel renderers ──
+
   function renderDiploBody(): void {
     if (!latest) return;
     const me = latest.players.find((p) => p.id === session.playerId);
@@ -693,9 +1083,9 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
           : city.buildings
               .map((b) => {
                 const def = pack?.buildings.find((x) => (x.id as unknown as string) === b);
-                const yields = def?.city_yields ?? {};
+                const byields = def?.city_yields ?? {};
                 const yieldStr = (["food", "production", "gold", "science", "culture"] as const)
-                  .map((k) => (yields[k] ? `+${yields[k]}${k[0]}` : ""))
+                  .map((k) => (byields[k] ? `+${byields[k]}${k[0]}` : ""))
                   .filter(Boolean)
                   .join(" ");
                 return `<span class='built-building'>${escape(buildingName(b))}${yieldStr ? ` <span class='dim'>${yieldStr}</span>` : ""}</span>`;
@@ -737,11 +1127,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
       });
     });
     cpBody.querySelector<HTMLButtonElement>("#cp-buy")?.addEventListener("click", () => {
-      client.sendIntent({
-        type: "BuyProduction",
-        actorId: session.playerId,
-        cityId: city.id,
-      });
+      client.sendIntent({ type: "BuyProduction", actorId: session.playerId, cityId: city.id });
     });
     cpBody.querySelector<HTMLButtonElement>("#cp-clear")?.addEventListener("click", () => {
       client.sendIntent({
@@ -768,11 +1154,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     const techsInTree = pack.techs.filter((t) => t.tree_id === treeId);
     const erasInOrder = [...pack.eras].sort((a, b) => a.order - b.order);
 
-    // ---------- Layout ----------
-    const COL_W = 200;
-    const ROW_H = 76;
-    const COL_PAD_X = 24;
-    const PAD_TOP = 50;
+    const COL_W = 200, ROW_H = 76, COL_PAD_X = 24, PAD_TOP = 50;
     const eraIndex = new Map<string, number>(
       erasInOrder.map((e, i) => [e.id as unknown as string, i]),
     );
@@ -783,7 +1165,6 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
       arr.push(tech);
       techsByEra.set(eId, arr);
     }
-    // x by era index; y by stable order within era
     const positions = new Map<string, { x: number; y: number }>();
     let maxRow = 0;
     for (const [eId, list] of techsByEra) {
@@ -799,7 +1180,6 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     const TOTAL_W = COL_PAD_X * 2 + erasInOrder.length * COL_W;
     const TOTAL_H = PAD_TOP + maxRow * ROW_H + 16;
 
-    // Era column headers
     const eraHeaders = erasInOrder
       .map((era, i) => {
         const x = COL_PAD_X + i * COL_W;
@@ -807,7 +1187,6 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
       })
       .join("");
 
-    // Tech boxes
     const techBoxes = techsInTree
       .map((tech) => {
         const id = tech.id as unknown as string;
@@ -831,7 +1210,6 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
       })
       .join("");
 
-    // SVG lines for prereqs
     const lineSegments: string[] = [];
     for (const tech of techsInTree) {
       const id = tech.id as unknown as string;
@@ -841,13 +1219,11 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
         const pid = p as unknown as string;
         const from = positions.get(pid);
         if (!from) continue;
-        // From the right edge of `from` box to the left edge of `to` box.
         const x1 = from.x + (COL_W - 24);
         const y1 = from.y + (ROW_H - 12) / 2;
         const x2 = to.x;
         const y2 = to.y + (ROW_H - 12) / 2;
         const cx = (x1 + x2) / 2;
-        // Curve via cubic
         lineSegments.push(
           `<path d="M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}" />`,
         );
@@ -875,17 +1251,14 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     tpBody.querySelectorAll<HTMLButtonElement>("button.tech-box").forEach((btn) => {
       btn.addEventListener("click", () => {
         const techId = btn.dataset.id!;
-        client.sendIntent({
-          type: "SetResearch",
-          actorId: session.playerId,
-          techId,
-        });
+        client.sendIntent({ type: "SetResearch", actorId: session.playerId, techId });
       });
     });
   }
 
+  // ── Helpers ──
+
   function renderTechItem(_tech: Tech, _me: Player, _isMyTurn: boolean): string {
-    // (legacy — no longer used; the tree layout supersedes it)
     return "";
   }
 
@@ -913,12 +1286,23 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
   function techName(id: string): string {
     return pack?.techs.find((t) => (t.id as unknown as string) === id)?.name ?? id;
   }
-
+  function improvementName(id: string): string {
+    return pack?.improvements.find((x) => (x.id as unknown as string) === id)?.name ?? id;
+  }
+  function shortResourceName(id: string): string {
+    if (!pack) return id;
+    const r = pack.resources.find((x) => (x.id as unknown as string) === id);
+    return r?.name ?? id.replace(/^resource\./, "");
+  }
+  function eraName(eraId: string): string {
+    if (!pack) return eraId;
+    const e = pack.eras.find((x) => (x.id as unknown as string) === eraId);
+    return e?.name ?? eraId;
+  }
   function labelFor(item: ProductionItem): string {
     if (item.kind === "unit") return unitName(item.defId);
     return buildingName(item.defId);
   }
-
   function productionCostOf(item: ProductionItem, p: ContentPack): number | null {
     if (item.kind === "unit") {
       const def = p.units.find((u) => (u.id as unknown as string) === item.defId);
@@ -928,16 +1312,15 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     return def?.cost.production ?? null;
   }
 
+  // ── Reachable overlay ──
+
   function updateReachable(): void {
     if (!mapView || !latest || !latest.map || !selectedUnitId) {
       mapView?.setReachable(new Map(), null);
       return;
     }
     const unit = latest.units.find((u) => u.id === selectedUnitId);
-    if (!unit) {
-      mapView.setReachable(new Map(), null);
-      return;
-    }
+    if (!unit) { mapView.setReachable(new Map(), null); return; }
     const def = pack?.units.find((u) => (u.id as unknown as string) === unit.defId);
     if (pack && def) {
       const reach = computeReachable(latest.map, unit.position, unit.movementLeft, pack, {
@@ -947,216 +1330,101 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
       mapView.setReachable(reach, selectedUnitId);
       return;
     }
-    // Pack not loaded yet: fall back to uniform-cost approximation.
     const fakeContent = {
       terrains: (latest.map.tiles ?? []).map((t) => ({
-        id: t.terrain,
-        name: t.terrain,
-        base_yields: {},
-        movement_cost: 1,
-        impassable: false,
-        passable_by_traits: [],
-        domains: [],
+        id: t.terrain, name: t.terrain, base_yields: {}, movement_cost: 1,
+        impassable: false, passable_by_traits: [], domains: [],
       })),
     } as never;
     const reach = computeReachable(latest.map, unit.position, unit.movementLeft, fakeContent);
     mapView.setReachable(reach, selectedUnitId);
   }
 
-  function updateSelectedLabel(): void {
-    if (selectedCityId && latest) {
-      const c = latest.cities.find((x) => x.id === selectedCityId);
-      selectedEl.textContent = c ? `City: ${c.name} (pop ${c.population})` : "—";
-      return;
-    }
-    if (!selectedUnitId || !latest) {
-      selectedEl.textContent = "—";
-      return;
-    }
-    const u = latest.units.find((x) => x.id === selectedUnitId);
-    if (!u) {
-      selectedEl.textContent = "—";
-      return;
-    }
-    const name = unitName(u.defId);
-    const cargo = latest.units.filter((x) => x.boardedOn === u.id);
-    const cargoLabel =
-      cargo.length > 0
-        ? ` · cargo: ${cargo.map((c) => unitName(c.defId)).join(", ")}`
-        : "";
-    const boarded = u.boardedOn ? " · onboard" : "";
-    selectedEl.textContent = `${name} (${u.movementLeft}/${u.movementMax} MP)${cargoLabel}${boarded}`;
-  }
-
-  function updateFoundButton(): void {
-    if (!latest || latest.status !== "in_progress") {
-      foundBtn.disabled = true;
-      return;
-    }
-    const isMyTurn =
-      latest.players[latest.currentPlayerIndex]?.id === session.playerId;
-    if (!isMyTurn || !selectedUnitId) {
-      foundBtn.disabled = true;
-      return;
-    }
-    const unit = latest.units.find((u) => u.id === selectedUnitId);
-    if (!unit || unit.defId !== "unit.settler") {
-      foundBtn.disabled = true;
-      return;
-    }
-    const stateLike = { cities: latest.cities } as never;
-    foundBtn.disabled = !canFoundCityAt(stateLike, unit.position);
-  }
-
-  function updateImprovementsRow(): void {
-    if (!latest || !pack || !selectedUnitId) {
-      improvementsRow.classList.add("hidden");
-      return;
-    }
-    const isMyTurn =
-      latest.players[latest.currentPlayerIndex]?.id === session.playerId;
-    if (!isMyTurn) {
-      improvementsRow.classList.add("hidden");
-      return;
-    }
-    const unit = latest.units.find((u) => u.id === selectedUnitId);
-    if (!unit) {
-      improvementsRow.classList.add("hidden");
-      return;
-    }
-    const def = pack.units.find((u) => (u.id as unknown as string) === unit.defId);
-    const isWorker = def?.traits.some((t) => (t as unknown as string) === "worker");
-    if (!isWorker) {
-      improvementsRow.classList.add("hidden");
-      return;
-    }
-    const tile = latest.map?.tiles.find((t) => t.q === unit.position.q && t.r === unit.position.r);
-    if (!tile) {
-      improvementsRow.classList.add("hidden");
-      return;
-    }
-    if (tile.improvement || tile.workInProgress) {
-      improvementsRow.classList.remove("hidden");
-      improvementsList.innerHTML = tile.improvement
-        ? `<span class="dim">${escape(improvementName(tile.improvement))} already here</span>`
-        : `<span class="dim">in progress (${tile.workInProgress!.turnsLeft} turns left)</span>`;
-      return;
-    }
-    const me = latest.players.find((p) => p.id === session.playerId)!;
-    const opts = buildableImprovementsForTile(pack, me, tile);
-    if (opts.length === 0) {
-      improvementsRow.classList.add("hidden");
-      return;
-    }
-    improvementsRow.classList.remove("hidden");
-    improvementsList.innerHTML = opts
-      .map(
-        (i) => `<button class="cp-build" data-id="${i.id}">${escape(i.name)} <span class='dim'>${i.build_turns}t</span></button>`,
-      )
-      .join("");
-    improvementsList.querySelectorAll<HTMLButtonElement>("button.cp-build").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const improvementId = btn.dataset.id!;
-        client.sendIntent({
-          type: "BuildImprovement",
-          actorId: session.playerId,
-          unitId: selectedUnitId!,
-          improvementId,
-        });
-      });
-    });
-  }
-
-  function improvementName(id: string): string {
-    return pack?.improvements.find((x) => (x.id as unknown as string) === id)?.name ?? id;
-  }
-
-  function updateUpgradeButton(): void {
-    if (!latest || !pack || latest.status !== "in_progress") {
-      upgradeBtn.disabled = true;
-      upgradeBtn.textContent = "Upgrade";
-      return;
-    }
-    const isMyTurn = latest.players[latest.currentPlayerIndex]?.id === session.playerId;
-    if (!isMyTurn || !selectedUnitId) {
-      upgradeBtn.disabled = true;
-      upgradeBtn.textContent = "Upgrade";
-      return;
-    }
-    const unit = latest.units.find((u) => u.id === selectedUnitId);
-    if (!unit) {
-      upgradeBtn.disabled = true;
-      return;
-    }
-    const def = pack.units.find((u) => (u.id as unknown as string) === unit.defId);
-    if (!def?.evolves_to) {
-      upgradeBtn.disabled = true;
-      upgradeBtn.textContent = "Upgrade";
-      return;
-    }
-    const newDef = pack.units.find((u) => (u.id as unknown as string) === (def.evolves_to as unknown as string));
-    const me = latest.players.find((p) => p.id === session.playerId);
-    if (!newDef || !me) {
-      upgradeBtn.disabled = true;
-      return;
-    }
-    const cost = def.upgrade_cost.gold ?? 0;
-    const techOk =
-      !newDef.prereq_tech ||
-      me.researchedTechs.includes(newDef.prereq_tech as unknown as string);
-    const goldOk = me.gold >= cost;
-    upgradeBtn.disabled = !(techOk && goldOk);
-    upgradeBtn.textContent = `Upgrade → ${newDef.name} (${cost}g)`;
-  }
+  // ── State render ──
 
   function renderState(state: MatchView): void {
-    turnEl.textContent = state.status === "lobby" ? "lobby" : String(state.turnNumber);
+    // Lobby overlay: show during lobby, hide once in-progress
+    if (state.status === "lobby") {
+      lobbyOverlay.classList.remove("hidden");
+      const isHost = state.hostId === session.playerId;
+      loStart.disabled = !isHost || state.players.length < 2;
+      loWaiting.textContent = state.players.length < 2
+        ? "Waiting for players to join…"
+        : isHost ? "Ready — start when everyone is in." : "Waiting for host to start…";
+      loPlayers.innerHTML = state.players.map((p) => {
+        const you = p.id === session.playerId ? `<span class="lo-you">(you)</span>` : "";
+        const host = p.id === state.hostId ? `<span class="lo-host-tag">host</span>` : "";
+        const conn = p.connected ? "🟢" : "⚪";
+        return `<li><span class="swatch" style="background:${p.primary_color}"></span>${conn} ${escape(p.name)} ${you}${host}</li>`;
+      }).join("");
+    } else {
+      lobbyOverlay.classList.add("hidden");
+    }
+
+    turnLabel.textContent = state.status === "lobby"
+      ? `Lobby · ${state.players.length} player${state.players.length !== 1 ? "s" : ""}`
+      : `Turn ${state.turnNumber}`;
+
     const current = state.players[state.currentPlayerIndex];
-    activeEl.textContent =
-      state.status === "in_progress" && current ? current.name : "—";
+    if (state.status === "in_progress" && current) {
+      const isMe = current.id === session.playerId;
+      activeBadge.textContent = isMe ? "Your turn" : `${current.name} to act`;
+      activeBadge.className = isMe ? "your-turn-badge" : "active-badge";
+    } else {
+      activeBadge.textContent = "";
+      activeBadge.className = "active-badge";
+    }
 
     const me = state.players.find((p) => p.id === session.playerId);
-    treasuryEl.textContent = me
-      ? `${me.gold} gold · ${me.culture} culture`
-      : "—";
-    eraEl.textContent = me ? capitalize(eraName(me.era)) : "—";
-    if (me) {
-      const cur = me.currentTech && pack ? lookupTech(pack, me.currentTech) : null;
-      researchEl.textContent = cur
-        ? `${cur.name} — ${me.science}/${cur.cost}`
-        : me.currentTech ?? "(none — pick one)";
-    } else {
-      researchEl.textContent = "—";
-    }
-    if (me && me.availableResources && Object.keys(me.availableResources).length > 0) {
-      resourcesEl.textContent = Object.entries(me.availableResources)
-        .map(([rid, n]) => `${shortResourceName(rid)}:${n}`)
-        .join(" · ");
-    } else {
-      resourcesEl.innerHTML = "<span class='dim'>none</span>";
-    }
+    eraBadge.textContent = me ? capitalize(eraName(me.era)) : "—";
 
-    playersEl.innerHTML = state.players
+    // Science per turn
+    const sciPt = state.cities
+      .filter((c) => c.ownerId === session.playerId)
+      .reduce((s, c) => s + (c.perTurnYields.science ?? 0), 0);
+    const cur = me?.currentTech && pack ? lookupTech(pack, me.currentTech) : null;
+    scienceRateEl.textContent = cur
+      ? `${cur.name} (${me?.science ?? 0}/${cur.cost}) +${sciPt}/t`
+      : `+${sciPt}/t`;
+
+    // Gold
+    const goldPt = state.cities
+      .filter((c) => c.ownerId === session.playerId)
+      .reduce((s, c) => s + (c.perTurnYields.gold ?? 0), 0);
+    goldLabelEl.textContent = me
+      ? `${me.gold}g (${goldPt >= 0 ? "+" : ""}${goldPt}/t)`
+      : "—";
+
+    // Start button: lobby host only
+    const isHost = state.hostId === session.playerId;
+    const canStart = isHost && state.status === "lobby";
+    startBtn.classList.toggle("hidden", !canStart);
+    startBtn.disabled = !canStart || state.players.length < 2;
+
+    endBtn.disabled = !(state.status === "in_progress" && current?.id === session.playerId);
+
+    // Menu: player list + resources
+    menuPlayers.innerHTML = state.players
       .map((p) => {
-        const youTag = p.id === session.playerId ? " <em>(you)</em>" : "";
-        const hostTag = p.id === state.hostId ? " <span class='tag'>host</span>" : "";
+        const you = p.id === session.playerId ? " (you)" : "";
         const conn = p.connected ? "🟢" : "⚪";
-        const turnTag =
-          state.status === "in_progress" && p.id === current?.id
-            ? " <span class='tag tag-active'>to act</span>"
-            : "";
-        const civ = p.civId ? ` <span class="civ">${escape(p.civId)}</span>` : "";
-        const swatch = `<span class="swatch" style="background:${p.primary_color};border-color:${p.secondary_color}"></span>`;
-        return `<li>${swatch}${conn} ${escape(p.name)}${youTag}${hostTag}${civ}${turnTag}</li>`;
+        const turnTag = state.status === "in_progress" && p.id === current?.id
+          ? " <span class='tag tag-active'>acting</span>" : "";
+        return `<div class="menu-player-row"><span class="swatch" style="background:${p.primary_color}"></span>${conn} ${escape(p.name)}${you}${turnTag}</div>`;
       })
       .join("");
 
-    const isHost = state.hostId === session.playerId;
-    startBtn.disabled = !(isHost && state.status === "lobby" && state.players.length >= 2);
-    endBtn.disabled = !(state.status === "in_progress" && current?.id === session.playerId);
+    if (me && me.availableResources && Object.keys(me.availableResources).length > 0) {
+      const resStr = Object.entries(me.availableResources)
+        .map(([rid, n]) => `${shortResourceName(rid)}×${n}`)
+        .join(" · ");
+      menuResSection.innerHTML = `<div class="menu-res">Resources: ${resStr}</div>`;
+    } else {
+      menuResSection.innerHTML = "";
+    }
 
     logEl.innerHTML = state.log
-      .slice(-12)
+      .slice(-15)
       .map((l) => `<li><code>T${l.turn}</code> ${escape(l.text)}</li>`)
       .join("");
 
@@ -1177,23 +1445,12 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
     if (mapView) {
       mapView.render(state);
       updateReachable();
-      updateSelectedLabel();
-      updateFoundButton();
-      updateUpgradeButton();
+      updateActionPanel();
     }
   }
 
-  function shortResourceName(id: string): string {
-    if (!pack) return id;
-    const r = pack.resources.find((x) => (x.id as unknown as string) === id);
-    return r?.name ?? id.replace(/^resource\./, "");
-  }
-
-  function eraName(eraId: string): string {
-    if (!pack) return eraId;
-    const e = pack.eras.find((x) => (x.id as unknown as string) === eraId);
-    return e?.name ?? eraId;
-  }
+  void renderTechItem; // suppress unused warning
+  void techName;       // suppress unused warning
 }
 
 function capitalize(s: string): string {

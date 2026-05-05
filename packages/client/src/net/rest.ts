@@ -13,7 +13,9 @@ import type {
  */
 const SERVER =
   (import.meta.env.VITE_SERVER_URL as string | undefined) ??
-  (import.meta.env.DEV ? "http://localhost:8787" : window.location.origin);
+  (import.meta.env.DEV
+    ? `http://${window.location.hostname}:8787`
+    : window.location.origin);
 
 export interface MatchAndCredential {
   match: MatchSummary;
