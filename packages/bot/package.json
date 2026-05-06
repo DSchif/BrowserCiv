@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "tsx src/index.ts",
+    "start:train": "tsx src/train.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },

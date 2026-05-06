@@ -1,4 +1,5 @@
 export * from "./actions.js";
+export * from "./legal-intents.js";
 export * from "./city.js";
 export * from "./combat.js";
 export * from "./map-gen.js";
