@@ -15,6 +15,8 @@
     "validate-content": "tsx packages/content-validator/src/cli.ts content/core-realworld",
     "dev:client": "pnpm --filter @browserciv/client run dev",
     "dev:server": "pnpm --filter @browserciv/server run dev",
+    "train": "pnpm --filter @browserciv/bot run session",
+    "plot": "pnpm --filter @browserciv/bot run plot",
     "synth": "pnpm --filter @browserciv/infra run synth"
   },
   "devDependencies": {

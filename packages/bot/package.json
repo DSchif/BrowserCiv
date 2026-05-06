@@ -10,6 +10,7 @@
     "start": "tsx src/index.ts",
     "start:train": "tsx src/train.ts",
     "plot": "tsx src/plot.ts",
+    "session": "tsx src/session.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },

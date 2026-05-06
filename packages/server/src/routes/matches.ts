@@ -259,4 +259,102 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
 
     return reply.send({ matchId, agentToken, spectatorToken });
   });
+
+  /**
+   * Create a training match in lobby state without starting it.
+   * Lets you hand out the spectator URL before any turns have been played.
+   *
+   * Body: { mapSize?: string, strategy?: string }
+   * Returns: { matchId, agentToken, spectatorToken, opponentId }
+   */
+  app.post("/train-setup", async (request, reply) => {
+    const body = (request.body ?? {}) as { mapSize?: string; strategy?: string };
+
+    const content = getContentPack();
+    const matchId = nanoid(12);
+    const agentId = nanoid(16);
+    const opponentId = nanoid(16);
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const now = new Date().toISOString();
+    const mapSize = (["small", "medium", "large"].includes(body.mapSize ?? "")
+      ? body.mapSize
+      : "small") as "small" | "medium" | "large";
+
+    const rt = new MatchRuntime({} as never, content);
+    rt.applyBootstrap({
+      type: "MatchCreate",
+      matchId,
+      hostId: agentId,
+      hostName: "Agent",
+      hostCivId: content.civilizations[0]!.id as unknown as string,
+      contentPackId: content.manifest.id as unknown as string,
+      seed,
+      mapSize,
+      maxPlayers: 2,
+      createdAt: now,
+    });
+
+    const opponentCivId = pickAvailableCiv(rt.state, content);
+    if (!opponentCivId) return reply.code(500).send({ error: "NO_CIVS" });
+
+    const strategy =
+      typeof body.strategy === "string" && STRATEGIES[body.strategy]
+        ? body.strategy
+        : "random";
+
+    rt.apply({
+      type: "PlayerJoin",
+      playerId: opponentId,
+      name: `Bot (${strategy})`,
+      civId: opponentCivId,
+    });
+
+    putMatch(rt);
+
+    const agentToken = issueToken(agentId, matchId);
+    const spectatorToken = issueSpectatorToken(matchId);
+
+    return reply.send({ matchId, agentToken, spectatorToken, opponentId, strategy });
+  });
+
+  /**
+   * Start a match previously created with /train-setup and attach the
+   * opponent bot driver.  Must be called by the host (agent) token.
+   *
+   * Body: { matchId, agentToken, opponentId, strategy?, noFog? }
+   */
+  app.post("/train-start", async (request, reply) => {
+    const body = (request.body ?? {}) as {
+      matchId: string;
+      agentToken: string;
+      opponentId: string;
+      strategy?: string;
+      noFog?: boolean;
+    };
+
+    const rt = getMatch(body.matchId);
+    if (!rt) return reply.code(404).send({ error: "NOT_FOUND" });
+    if (rt.state.status !== "lobby") return reply.code(409).send({ error: "ALREADY_STARTED" });
+
+    const cred = body.agentToken ? lookupToken(body.agentToken) : null;
+    if (!cred || cred.matchId !== body.matchId) return reply.code(403).send({ error: "FORBIDDEN" });
+    if (rt.state.hostId !== cred.playerId) return reply.code(403).send({ error: "NOT_HOST" });
+
+    const strategy =
+      typeof body.strategy === "string" && STRATEGIES[body.strategy]
+        ? body.strategy
+        : "random";
+
+    rt.apply({
+      type: "MatchStart",
+      actorId: cred.playerId,
+      startedAt: new Date().toISOString(),
+      noFog: body.noFog ?? true,
+    });
+
+    new BotDriver(rt, body.opponentId, strategy);
+    rt.broadcastSnapshot();
+
+    return reply.send({ ok: true });
+  });
 }
