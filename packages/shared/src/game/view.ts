@@ -10,6 +10,50 @@ import type {
 import { visibleResourcesFor } from "./resources.js";
 import { currentlyVisibleFor } from "./visibility.js";
 
+/**
+ * Full-visibility view for spectators. All tiles visible, all units shown,
+ * all city internals exposed. viewerId is set to "__spectator__" so the
+ * client never treats any unit/city as "mine".
+ */
+export function buildSpectatorView(state: MatchState): MatchView {
+  let map: MapView | null = null;
+  if (state.map) {
+    map = {
+      width: state.map.width,
+      height: state.map.height,
+      tiles: state.map.tiles.map((t) => {
+        const k = hexKey({ q: t.q, r: t.r });
+        const tile: import("./state.js").TileView = {
+          ...t,
+          visibility: "visible" as TileVisibility,
+        };
+        const ownerCityId = state.tileOwnership[k];
+        if (ownerCityId) tile.ownerCityId = ownerCityId;
+        return tile;
+      }),
+    };
+  }
+  return {
+    id: state.id,
+    status: state.status,
+    hostId: state.hostId,
+    contentPackId: state.contentPackId,
+    viewerId: "__spectator__",
+    players: state.players,
+    currentPlayerIndex: state.currentPlayerIndex,
+    turnNumber: state.turnNumber,
+    map,
+    units: state.units,
+    cities: state.cities,
+    diplomacy: state.diplomacy ?? {},
+    wondersBuilt: state.wondersBuilt ?? {},
+    actionSeq: state.actionSeq,
+    createdAt: state.createdAt,
+    startedAt: state.startedAt,
+    log: state.log,
+  };
+}
+
 /** Per-player view. Server runs this per recipient before broadcasting. */
 export function buildView(
   state: MatchState,

@@ -6,7 +6,7 @@ import type {
   MatchSummary,
   ServerMessage,
 } from "@browserciv/shared";
-import { GameRuleError, buildView, reduce } from "@browserciv/shared";
+import { GameRuleError, buildSpectatorView, buildView, reduce } from "@browserciv/shared";
 
 /** Minimal structural type for the WebSocket from @fastify/websocket. */
 export interface WsLike {
@@ -28,6 +28,7 @@ export function setApplyListener(fn: ((rt: MatchRuntime) => void) | null): void 
 
 export class MatchRuntime {
   private conns = new Set<SocketConn>();
+  private spectators = new Set<WsLike>();
   private stateListeners = new Set<(rt: MatchRuntime) => void>();
 
   constructor(
@@ -219,6 +220,22 @@ export class MatchRuntime {
     };
   }
 
+  attachSpectator(ws: WsLike): () => void {
+    this.spectators.add(ws);
+    this.sendSpectatorSnapshot(ws);
+    return () => this.spectators.delete(ws);
+  }
+
+  sendSpectatorSnapshot(ws: WsLike): void {
+    const view = buildSpectatorView(this.state);
+    const message: ServerMessage = {
+      type: "Snapshot",
+      actionSeq: this.state.actionSeq,
+      state: view,
+    };
+    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
+  }
+
   /**
    * Send each connected player a snapshot rendered for their viewer id —
    * filtered for fog of war. Without this, network observers can read
@@ -227,6 +244,9 @@ export class MatchRuntime {
   broadcastSnapshot(): void {
     for (const conn of this.conns) {
       this.sendSnapshot(conn.ws, conn.playerId);
+    }
+    for (const ws of this.spectators) {
+      this.sendSpectatorSnapshot(ws);
     }
   }
 

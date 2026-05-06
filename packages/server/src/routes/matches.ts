@@ -6,7 +6,7 @@ import {
 } from "@browserciv/shared";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { issueToken } from "../auth.js";
+import { issueSpectatorToken, issueToken, lookupToken } from "../auth.js";
 import { BotDriver, STRATEGIES } from "../bot-driver.js";
 import { getContentPack } from "../content.js";
 import { getMatch, listLobbies, putMatch } from "../match-store.js";
@@ -125,6 +125,71 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       rt.broadcastSnapshot();
 
       return reply.send({ playerId, name: botName, strategy });
+    },
+  );
+
+  /** Issue a spectator token for any match (no player slot required). */
+  app.post<{ Params: { id: string } }>(
+    "/matches/:id/spectate",
+    async (request, reply) => {
+      const rt = getMatch(request.params.id);
+      if (!rt) return reply.code(404).send({ error: "NOT_FOUND" });
+      const cred = issueSpectatorToken(request.params.id);
+      return reply.send({ credential: cred });
+    },
+  );
+
+  /**
+   * Start a match as a spectator: starts the match, assigns a bot to every
+   * human player slot (so turns advance automatically), and returns a
+   * spectator token so the caller can watch without participating.
+   *
+   * Body: { token: string, strategy?: string, noFog?: boolean }
+   * `token` must be the host's player token.
+   */
+  app.post<{ Params: { id: string } }>(
+    "/matches/:id/bot-start",
+    async (request, reply) => {
+      const matchId = request.params.id;
+      const rt = getMatch(matchId);
+      if (!rt) return reply.code(404).send({ error: "NOT_FOUND" });
+      if (rt.state.status !== "lobby") {
+        return reply.code(409).send({ error: "MATCH_ALREADY_STARTED" });
+      }
+
+      const body = (request.body ?? {}) as { token?: string; strategy?: string; noFog?: boolean };
+      const cred = body.token ? lookupToken(body.token) : null;
+      if (!cred || cred.matchId !== matchId) {
+        return reply.code(403).send({ error: "FORBIDDEN" });
+      }
+      if (rt.state.hostId !== cred.playerId) {
+        return reply.code(403).send({ error: "NOT_HOST" });
+      }
+      if (rt.state.players.length < 2) {
+        return reply.code(409).send({ error: "TOO_FEW_PLAYERS" });
+      }
+
+      const strategy = typeof body.strategy === "string" && STRATEGIES[body.strategy]
+        ? body.strategy
+        : "passive";
+
+      // Start the match.
+      rt.apply({
+        type: "MatchStart",
+        actorId: cred.playerId,
+        startedAt: new Date().toISOString(),
+        noFog: body.noFog ?? true,
+      });
+
+      // Assign a bot driver to every player slot so turns advance automatically.
+      for (const p of rt.state.players) {
+        new BotDriver(rt, p.id, strategy);
+      }
+
+      rt.broadcastSnapshot();
+
+      const spectatorCred = issueSpectatorToken(matchId);
+      return reply.send({ credential: spectatorCred });
     },
   );
 }

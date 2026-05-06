@@ -4,6 +4,7 @@ export interface GuestCredential {
   playerId: string;
   matchId: string;
   token: string;
+  spectator?: boolean;
 }
 
 const tokens = new Map<string, GuestCredential>();
@@ -18,6 +19,14 @@ export function setTokenChangeListener(fn: (() => void) | null): void {
 export function issueToken(playerId: string, matchId: string): GuestCredential {
   const token = nanoid(32);
   const cred = { playerId, matchId, token };
+  tokens.set(token, cred);
+  onChange?.();
+  return cred;
+}
+
+export function issueSpectatorToken(matchId: string): GuestCredential {
+  const token = nanoid(32);
+  const cred: GuestCredential = { playerId: "", matchId, token, spectator: true };
   tokens.set(token, cred);
   onChange?.();
   return cred;

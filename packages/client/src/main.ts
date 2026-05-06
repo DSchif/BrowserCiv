@@ -19,7 +19,12 @@ function showMatch(res: LobbyResult): void {
       name: res.name,
     },
     () => showLobby(),
+    (spectatorSession) => showSpectator(spectatorSession),
   );
+}
+
+function showSpectator(session: import("./ui/match.js").MatchSession): void {
+  renderMatch(root, session, () => showLobby());
 }
 
 showLobby();

@@ -37,9 +37,15 @@ export interface MatchSession {
   playerId: string;
   token: string;
   name: string;
+  spectator?: boolean;
 }
 
-export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: () => void): void {
+export function renderMatch(
+  root: HTMLElement,
+  session: MatchSession,
+  onLeave: () => void,
+  onSpectate?: (session: MatchSession) => void,
+): void {
   root.innerHTML = `
     <canvas id="game-canvas"></canvas>
 
@@ -58,6 +64,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
           <div class="lo-bot-row">
             <select id="lo-bot-type">
               <option value="random">Random bot</option>
+              <option value="greedy">Greedy bot (cities &amp; units)</option>
               <option value="passive">Passive bot (ends turn only)</option>
             </select>
             <button class="lo-add-bot" id="lo-add-bot">+ Add Bot</button>
@@ -65,6 +72,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
         </div>
         <div class="lo-actions">
           <button class="lo-start" id="lo-start" disabled>Start Match</button>
+          <button class="lo-watch" id="lo-watch" disabled>Start &amp; Watch</button>
           <button class="lo-leave" id="lo-leave-lobby">Leave</button>
         </div>
       </div>
@@ -76,6 +84,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
         <span id="era-badge" class="era-badge">—</span>
         <code class="match-code">${escape(session.matchId)}</code>
         <button id="start" class="tb-btn tb-start hidden" disabled>Start match</button>
+        ${session.spectator ? `<span class="tb-spectator-badge">Watching</span>` : ""}
       </div>
       <div class="tb-center">
         <span id="turn-label" class="tb-dim">connecting…</span>
@@ -142,6 +151,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
   const loPlayers = root.querySelector<HTMLUListElement>("#lo-players")!;
   const loWaiting = root.querySelector<HTMLDivElement>("#lo-waiting")!;
   const loStart = root.querySelector<HTMLButtonElement>("#lo-start")!;
+  const loWatch = root.querySelector<HTMLButtonElement>("#lo-watch")!;
   const loNoFog = root.querySelector<HTMLInputElement>("#lo-no-fog")!;
   const loSettings = root.querySelector<HTMLDivElement>("#lo-settings")!;
   const loBotType = root.querySelector<HTMLSelectElement>("#lo-bot-type")!;
@@ -235,6 +245,14 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
   });
   client.connect();
 
+  // In spectator mode, hide all player-action UI permanently.
+  if (session.spectator) {
+    lobbyOverlay.classList.add("hidden");
+    endBtn.classList.add("hidden");
+    actionPanel.classList.add("hidden");
+    root.querySelector<HTMLButtonElement>("#start")?.classList.add("hidden");
+  }
+
   (window as unknown as { __BROWSERCIV: unknown }).__BROWSERCIV = {
     session,
     latest: () => latest,
@@ -254,6 +272,37 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
 
   loStart.addEventListener("click", () => {
     client.sendIntent({ type: "MatchStart", actorId: session.playerId, noFog: loNoFog.checked });
+  });
+  loWatch.addEventListener("click", () => {
+    loWatch.disabled = true;
+    fetch(`/matches/${session.matchId}/bot-start`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token: session.token,
+        strategy: loBotType.value,
+        noFog: true,
+      }),
+    })
+      .then((r) => r.json())
+      .then((body: unknown) => {
+        const cred = (body as { credential: { token: string; matchId: string } }).credential;
+        client.close();
+        const spectatorSession: MatchSession = {
+          matchId: cred.matchId,
+          playerId: "",
+          token: cred.token,
+          name: "Spectator",
+          spectator: true,
+        };
+        if (onSpectate) {
+          onSpectate(spectatorSession);
+        }
+      })
+      .catch((e: unknown) => {
+        console.error("bot-start failed", e);
+        loWatch.disabled = false;
+      });
   });
   loAddBot.addEventListener("click", () => {
     loAddBot.disabled = true;
@@ -1371,6 +1420,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
       lobbyOverlay.classList.remove("hidden");
       const isHost = state.hostId === session.playerId;
       loStart.disabled = !isHost || state.players.length < 2;
+      loWatch.disabled = !isHost || state.players.length < 2;
       loSettings.classList.toggle("hidden", !isHost);
       loWaiting.textContent = state.players.length < 2
         ? "Waiting for players to join…"

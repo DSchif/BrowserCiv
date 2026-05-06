@@ -63,9 +63,76 @@ const randomBrain: Brain = (state: MatchView, playerId: string): Intent | null =
 const passiveBrain: Brain = (_state, playerId) =>
   ({ type: "EndTurn", actorId: playerId });
 
+/**
+ * Greedy brain: maximize cities and units.
+ * Priority order:
+ *   1. Found city with any settler that isn't already on a city
+ *   2. Move settler toward nearest unclaimed, passable tile
+ *   3. Set idle city production → settler (if fewer settlers than cities) else warrior
+ *   4. Set research if none active
+ *   5. End turn
+ */
+const greedyBrain: Brain = (state: MatchView, playerId: string): Intent | null => {
+  const myUnits = state.units.filter((u) => u.ownerId === playerId);
+  const myCities = state.cities.filter((c) => c.ownerId === playerId);
+  const tiles = new Map((state.map?.tiles ?? []).map((t) => [`${t.q},${t.r}`, t]));
+  const cityKeys = new Set(state.cities.map((c) => `${c.position.q},${c.position.r}`));
+  const occupiedKeys = new Set(state.units.map((u) => `${u.position.q},${u.position.r}`));
+
+  // 1. Found city with idle settler not already on a city tile
+  const idleSettler = myUnits.find(
+    (u) => u.defId === "unit.settler" &&
+      u.movementLeft > 0 &&
+      !cityKeys.has(`${u.position.q},${u.position.r}`),
+  );
+  if (idleSettler) {
+    return { type: "FoundCity", actorId: playerId, unitId: idleSettler.id };
+  }
+
+  // 2. Move any settler with movement left toward unclaimed passable land
+  const movableSettler = myUnits.find(
+    (u) => u.defId === "unit.settler" && u.movementLeft > 0,
+  );
+  if (movableSettler) {
+    const candidates = Hex.neighbors(movableSettler.position).filter((n) => {
+      const k = `${n.q},${n.r}`;
+      const tile = tiles.get(k);
+      if (!tile || occupiedKeys.has(k)) return false;
+      if (tile.ownerCityId) return false; // already claimed
+      return LAND_TERRAINS.has(tile.terrain) && tile.terrain !== "mountain";
+    });
+    const target = pick(candidates);
+    if (target) {
+      return { type: "MoveUnit", actorId: playerId, unitId: movableSettler.id, target };
+    }
+  }
+
+  // 3. Set production on idle cities
+  const idleCity = myCities.find((c) => !c.productionItem);
+  if (idleCity) {
+    const settlersCount = myUnits.filter((u) => u.defId === "unit.settler").length;
+    const wantSettler = settlersCount < myCities.length + 1;
+    return {
+      type: "SetCityProduction",
+      actorId: playerId,
+      cityId: idleCity.id,
+      item: { kind: "unit", defId: wantSettler ? "unit.settler" : "unit.warrior" },
+    };
+  }
+
+  // 4. Set research if none active
+  const me = state.players.find((p) => p.id === playerId);
+  if (me && !me.currentTech) {
+    return { type: "SetResearch", actorId: playerId, techId: "tech.bronze_working" };
+  }
+
+  return { type: "EndTurn", actorId: playerId };
+};
+
 export const STRATEGIES: Record<string, Brain> = {
   random: randomBrain,
   passive: passiveBrain,
+  greedy: greedyBrain,
 };
 
 // ── BotDriver ────────────────────────────────────────────────────────────────

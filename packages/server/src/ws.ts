@@ -29,6 +29,17 @@ export async function registerWsRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
+    // Spectators get full-visibility snapshots and cannot send intents.
+    if (cred.spectator) {
+      const detach = rt.attachSpectator(socket);
+      socket.on("message", (raw: unknown) => {
+        const parsed = JSON.parse(String(raw)) as { type?: string };
+        if (parsed?.type === "Hello") rt.sendSpectatorSnapshot(socket);
+      });
+      socket.on("close", () => detach());
+      return;
+    }
+
     const detach = rt.attach(cred.playerId, socket);
 
     socket.on("message", (raw: unknown) => {
