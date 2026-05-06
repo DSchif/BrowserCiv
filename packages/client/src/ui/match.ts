@@ -220,22 +220,20 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
   });
   client.connect();
 
-  if (import.meta.env.DEV) {
-    (window as unknown as { __BROWSERCIV: unknown }).__BROWSERCIV = {
-      session,
-      latest: () => latest,
-      pack: () => pack,
-      sendIntent: (intent: Parameters<typeof client.sendIntent>[0]) =>
-        client.sendIntent(intent),
-      selectUnit: (unitId: string) => {
-        selectedUnitId = unitId;
-        selectedCityId = null;
-        mapView?.setSelectedCity(null);
-        updateReachable();
-        updateActionPanel();
-      },
-    };
-  }
+  (window as unknown as { __BROWSERCIV: unknown }).__BROWSERCIV = {
+    session,
+    latest: () => latest,
+    pack: () => pack,
+    sendIntent: (intent: Parameters<typeof client.sendIntent>[0]) =>
+      client.sendIntent(intent),
+    selectUnit: (unitId: string) => {
+      selectedUnitId = unitId;
+      selectedCityId = null;
+      mapView?.setSelectedCity(null);
+      updateReachable();
+      updateActionPanel();
+    },
+  };
 
   // ── Event listeners ──
 
