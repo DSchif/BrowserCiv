@@ -15,6 +15,15 @@ export interface QAgentConfig {
   rewardFn: RewardFn;
 }
 
+export interface EpisodeRecord {
+  episode: number;
+  reward: number;
+  steps: number;
+  turns: number;
+  winner: string | null | undefined;
+  epsilon: number;
+}
+
 export const DEFAULT_CONFIG: QAgentConfig = {
   epsilon: 1.0,
   epsilonDecay: 0.995,
@@ -48,7 +57,7 @@ export class QAgent {
   config: QAgentConfig;
   epsilon: number;
   totalUpdates = 0;
-  episodeRewards: number[] = [];
+  episodeHistory: EpisodeRecord[] = [];
 
   constructor(config: Partial<QAgentConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -103,9 +112,19 @@ export class QAgent {
     this.totalUpdates++;
   }
 
-  endEpisode(totalReward: number): void {
-    this.episodeRewards.push(totalReward);
+  endEpisode(
+    totalReward: number,
+    meta: { steps?: number; turns?: number; winner?: string | null } = {},
+  ): void {
     this.epsilon = Math.max(this.config.epsilonMin, this.epsilon * this.config.epsilonDecay);
+    this.episodeHistory.push({
+      episode: this.episodeHistory.length + 1,
+      reward: totalReward,
+      steps: meta.steps ?? 0,
+      turns: meta.turns ?? 0,
+      winner: meta.winner,
+      epsilon: this.epsilon,
+    });
   }
 
   toBrain(content: ContentPack, training = true): (view: MatchView, playerId: string) => Intent | null {
@@ -121,6 +140,7 @@ export class QAgent {
       net: this.net.toJSON(),
       epsilon: this.epsilon,
       totalUpdates: this.totalUpdates,
+      episodeHistory: this.episodeHistory,
     }));
   }
 
@@ -129,16 +149,18 @@ export class QAgent {
       net: MLPWeights;
       epsilon: number;
       totalUpdates: number;
+      episodeHistory?: EpisodeRecord[];
     };
     this.net = MLP.fromJSON(data.net);
     this.epsilon = data.epsilon;
     this.totalUpdates = data.totalUpdates;
+    this.episodeHistory = data.episodeHistory ?? [];
   }
 
   stats(): string {
-    const n = this.episodeRewards.length;
+    const n = this.episodeHistory.length;
     if (n === 0) return "no episodes yet";
-    const last10 = this.episodeRewards.slice(-10);
+    const last10 = this.episodeHistory.slice(-10).map((e) => e.reward);
     const avg = last10.reduce((a, b) => a + b, 0) / last10.length;
     return `episodes=${n} ε=${this.epsilon.toFixed(3)} avg_reward(last10)=${avg.toFixed(2)} updates=${this.totalUpdates}`;
   }

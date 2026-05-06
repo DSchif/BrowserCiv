@@ -161,7 +161,7 @@ async function main(): Promise<void> {
     }
 
     totalSteps += epSteps;
-    agent.endEpisode(epReward);
+    agent.endEpisode(epReward, { steps: epSteps, turns: epTurns, winner: epWinner });
 
     // ── Logging ─────────────────────────────────────────────────────────────
     if (LOG_PATH) {
