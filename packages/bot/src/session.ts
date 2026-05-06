@@ -127,7 +127,15 @@ async function main(): Promise<void> {
   const procs: ChildProcess[] = [];
 
   function cleanup(): void {
-    procs.forEach((p) => { try { p.kill(); } catch { /* ignore */ } });
+    procs.forEach((p) => {
+      try {
+        // Kill the whole process group so grandchildren (tsx, vite) also die.
+        // p.pid is the pnpm wrapper; negating it targets the group.
+        if (p.pid) process.kill(-p.pid, "SIGTERM");
+      } catch {
+        try { p.kill(); } catch { /* ignore */ }
+      }
+    });
   }
   process.on("exit", cleanup);
   process.on("SIGINT",  () => { cleanup(); process.exit(0); });
@@ -143,14 +151,18 @@ async function main(): Promise<void> {
     console.log("Starting server and client...");
 
     // Pipe server stderr so errors surface (stdout is noisy startup logs — drop it)
-    const serverProc = spawn("pnpm", ["dev:server"], { cwd: ROOT, stdio: ["ignore", "ignore", "pipe"], shell: false });
+    const serverProc = spawn("pnpm", ["dev:server"], {
+      cwd: ROOT, detached: true, stdio: ["ignore", "ignore", "pipe"],
+    });
     serverProc.stderr?.on("data", (d: Buffer) => {
       const line = d.toString().trim();
       if (line) console.error(`  [server] ${line}`);
     });
     procs.push(serverProc);
 
-    procs.push(spawn("pnpm", ["dev:client"], { cwd: ROOT, stdio: "ignore", shell: false }));
+    procs.push(spawn("pnpm", ["dev:client"], {
+      cwd: ROOT, detached: true, stdio: "ignore",
+    }));
 
     await waitForUrl(`${SERVER_URL}/health`, "server");
     await waitForUrl(CLIENT_URL, "client");
