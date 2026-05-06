@@ -29,7 +29,7 @@ import { fileURLToPath } from "node:url";
 import type { ContentPack } from "@browserciv/shared";
 import type { AgentConfig } from "./agent/agent-config.js";
 import { QAgent } from "./agent/q-agent.js";
-import { cityAndUnitReward, buildRewardFn } from "./agent/reward.js";
+import { buildRewardFn } from "./agent/reward.js";
 import { runTrainingEpisode } from "./train-runner.js";
 
 // Root of the monorepo (packages/bot/src → packages/bot → packages → root)
@@ -118,7 +118,7 @@ async function trainStart(
   const res = await fetch(`${SERVER_URL}/train-start`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ matchId, agentToken, opponentId, strategy }),
+    body: JSON.stringify({ matchId, agentToken, opponentId, strategy, noFog: false }),
   });
   if (!res.ok) throw new Error(`train-start failed: ${res.status} ${await res.text()}`);
 }
@@ -183,7 +183,7 @@ async function main(): Promise<void> {
   const hidden = agentConfig?.network.hidden ?? [64, 32];
   const rewardFn = agentConfig?.rewards.length
     ? buildRewardFn(agentConfig.rewards)
-    : cityAndUnitReward;
+    : () => 0;
   const lr = agentConfig?.training.lr ?? LR;
   const epsilonDecay = agentConfig?.training.epsilon_decay;
   const epsilonMin = agentConfig?.training.epsilon_min;
@@ -247,7 +247,7 @@ async function main(): Promise<void> {
       agent,
       content,
       rewardFn,
-      verbose: true,
+      verbose: false,
       stallTimeoutMs: 3 * 60 * 1000,
     });
 

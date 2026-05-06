@@ -1,11 +1,7 @@
 {
   "network": { "hidden": [64, 32] },
   "rewards": [
-    { "signal": "cities_owned_delta",     "weight": 1.0  },
-    { "signal": "units_owned_delta",      "weight": 0.3  },
-    { "signal": "tiles_discovered_delta", "weight": 0.05 },
-    { "signal": "enemy_units_killed",     "weight": 0.5  },
-    { "signal": "hp_damage_dealt",        "weight": 0.02 }
+    { "signal": "tiles_discovered_delta", "weight": 1.0 }
   ],
   "training": {
     "lr": 0.001,
