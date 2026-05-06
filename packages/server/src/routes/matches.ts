@@ -192,4 +192,71 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       return reply.send({ credential: spectatorCred });
     },
   );
+
+  /**
+   * Create a ready-to-play training episode: a started 2-player match where
+   * the opponent is already driven by an in-process bot.  Returns tokens for
+   * the agent player and a spectator so the caller can watch in the browser.
+   *
+   * Body: { strategy?: string, mapSize?: string, noFog?: boolean }
+   */
+  app.post("/train-episode", async (request, reply) => {
+    const body = (request.body ?? {}) as {
+      strategy?: string;
+      mapSize?: string;
+      noFog?: boolean;
+    };
+
+    const content = getContentPack();
+    const matchId = nanoid(12);
+    const agentId = nanoid(16);
+    const opponentId = nanoid(16);
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const now = new Date().toISOString();
+    const mapSize = (["small", "medium", "large"].includes(body.mapSize ?? "")
+      ? body.mapSize
+      : "small") as "small" | "medium" | "large";
+    const strategy =
+      typeof body.strategy === "string" && STRATEGIES[body.strategy]
+        ? body.strategy
+        : "random";
+
+    const rt = new MatchRuntime({} as never, content);
+    rt.applyBootstrap({
+      type: "MatchCreate",
+      matchId,
+      hostId: agentId,
+      hostName: "Agent",
+      hostCivId: content.civilizations[0]!.id as unknown as string,
+      contentPackId: content.manifest.id as unknown as string,
+      seed,
+      mapSize,
+      maxPlayers: 2,
+      createdAt: now,
+    });
+
+    const opponentCivId = pickAvailableCiv(rt.state, content);
+    if (!opponentCivId) return reply.code(500).send({ error: "NO_CIVS" });
+    rt.apply({
+      type: "PlayerJoin",
+      playerId: opponentId,
+      name: `Bot (${strategy})`,
+      civId: opponentCivId,
+    });
+
+    rt.apply({
+      type: "MatchStart",
+      actorId: agentId,
+      startedAt: now,
+      noFog: body.noFog ?? true,
+    });
+
+    new BotDriver(rt, opponentId, strategy);
+    putMatch(rt);
+
+    const agentToken = issueToken(agentId, matchId);
+    const spectatorToken = issueSpectatorToken(matchId);
+
+    return reply.send({ matchId, agentToken, spectatorToken });
+  });
 }

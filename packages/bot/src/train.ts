@@ -20,6 +20,8 @@
  *   --gamma     <n>       Discount factor (default: 0.95)
  *   --epsilon   <n>       Initial exploration rate (default: 1.0)
  *   --server    <url>     Content pack server (default: http://localhost:8787)
+ *   --visual              Run games through the server so you can watch in the browser
+ *   --client-url <url>    Browser URL to print watch links for (default: http://localhost:5173)
  *   --verbose             Print per-episode stats
  */
 
@@ -29,6 +31,7 @@ import { QAgent, makeTransition } from "./agent/q-agent.js";
 import { cityAndUnitReward } from "./agent/reward.js";
 import { runHeadlessGame, type SyncBrain } from "./headless.js";
 import { randomBrain } from "./strategies/random.js";
+import { runTrainingEpisode } from "./train-runner.js";
 
 // ── Parse CLI args ────────────────────────────────────────────────────────────
 
@@ -51,6 +54,8 @@ const MAP_SIZE   = (arg("--map-size") ?? "small") as "small" | "medium" | "large
 const MAX_TURNS  = parseInt(arg("--max-turns") ?? "150", 10);
 const SERVER     = arg("--server") ?? "http://localhost:8787";
 const VERBOSE    = flag("--verbose");
+const VISUAL     = flag("--visual");
+const CLIENT_URL = arg("--client-url") ?? "http://localhost:5173";
 
 // ── Load content pack ─────────────────────────────────────────────────────────
 
@@ -87,55 +92,96 @@ async function main(): Promise<void> {
   let totalSteps = 0;
 
   for (let ep = 1; ep <= EPISODES; ep++) {
-    // ── Run one training episode ────────────────────────────────────────────
     let epReward = 0;
+    let epSteps = 0;
+    let epTurns = 0;
+    let epWinner: string | null | undefined;
 
-    const record = runHeadlessGame(
-      { agent: agentBrain, opponent: opponentBrain },
-      content,
-      cityAndUnitReward,
-      { mapSize: MAP_SIZE, maxTurns: MAX_TURNS, noFog: true },
-    );
+    if (VISUAL) {
+      // ── Visual episode: create a real server match and connect via WS ────
+      const episodeRes = await fetch(`${SERVER}/train-episode`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mapSize: MAP_SIZE, noFog: true }),
+      });
+      if (!episodeRes.ok) throw new Error(`Failed to create episode: ${episodeRes.status}`);
+      const { matchId, agentToken, spectatorToken } = await episodeRes.json() as {
+        matchId: string;
+        agentToken: { token: string; playerId: string };
+        spectatorToken: { token: string; playerId: string };
+      };
 
-    // ── Update agent from this episode's steps ──────────────────────────────
-    const agentSteps = record.steps.filter((s) => s.playerId === "agent");
-    for (let i = 0; i < agentSteps.length; i++) {
-      const step = agentSteps[i]!;
-      const nextStep = agentSteps[i + 1] ?? null;
-      epReward += step.reward;
-      const transition = makeTransition(
-        step.view,
-        "agent",
-        step.intent,
-        step.reward,
-        nextStep?.view ?? null,
+      const watchUrl = `${CLIENT_URL}?spectateMatch=${matchId}&token=${spectatorToken.token}`;
+      console.log(`\n[ep ${ep}/${EPISODES}] Watch: ${watchUrl}\n`);
+
+      const result = await runTrainingEpisode({
+        serverUrl: SERVER,
+        matchId,
+        agentToken: agentToken.token,
+        playerId: agentToken.playerId,
+        agent,
         content,
+        rewardFn: cityAndUnitReward,
+        verbose: VERBOSE,
+      });
+
+      epReward = result.agentReward;
+      epSteps  = result.agentSteps;
+      epTurns  = result.turns;
+      epWinner = result.winner;
+    } else {
+      // ── Headless episode: in-memory, no server required ──────────────────
+      const record = runHeadlessGame(
+        { agent: agentBrain, opponent: opponentBrain },
+        content,
+        cityAndUnitReward,
+        { mapSize: MAP_SIZE, maxTurns: MAX_TURNS, noFog: true },
       );
-      agent.update(transition);
-      totalSteps++;
+
+      const agentSteps = record.steps.filter((s) => s.playerId === "agent");
+      for (let i = 0; i < agentSteps.length; i++) {
+        const step = agentSteps[i]!;
+        const nextStep = agentSteps[i + 1] ?? null;
+        epReward += step.reward;
+        const transition = makeTransition(
+          step.view,
+          "agent",
+          step.intent,
+          step.reward,
+          nextStep?.view ?? null,
+          content,
+        );
+        agent.update(transition);
+        totalSteps++;
+      }
+
+      epSteps  = agentSteps.length;
+      epTurns  = record.turns;
+      epWinner = record.winner;
     }
 
+    totalSteps += epSteps;
     agent.endEpisode(epReward);
 
     // ── Logging ─────────────────────────────────────────────────────────────
     if (LOG_PATH) {
       const entry = {
         episode: ep,
-        steps: agentSteps.length,
+        steps: epSteps,
         reward: epReward,
-        turns: record.turns,
+        turns: epTurns,
         epsilon: agent.epsilon,
-        winner: record.winner,
+        winner: epWinner,
       };
       appendFileSync(LOG_PATH, JSON.stringify(entry) + "\n");
     }
 
     if (VERBOSE || ep % EVAL_EVERY === 0) {
-      console.log(`[ep ${ep}/${EPISODES}] turns=${record.turns} reward=${epReward.toFixed(1)} ${agent.stats()}`);
+      console.log(`[ep ${ep}/${EPISODES}] turns=${epTurns} reward=${epReward.toFixed(1)} ${agent.stats()}`);
     }
 
-    // ── Evaluation run (greedy, no exploration) ─────────────────────────────
-    if (ep % EVAL_EVERY === 0) {
+    // ── Evaluation run (greedy, no exploration) — headless only ─────────────
+    if (!VISUAL && ep % EVAL_EVERY === 0) {
       const evalBrain = agent.toBrain(content, false /* greedy */);
       const evalRecord = runHeadlessGame(
         { agent: evalBrain, opponent: opponentBrain },
