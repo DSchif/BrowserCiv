@@ -136,15 +136,19 @@ export async function runTrainingEpisode(opts: {
       }
 
       if (msg.type === "IntentReject") {
+        if (settled) return;
         log(`intent rejected: ${msg.code}`);
-        // Clear pending and force end turn to avoid getting stuck
         pendingPrev = null;
         pendingIntent = null;
-        send({
-          type: "Intent",
-          clientSeq: clientSeq++,
-          intent: { type: "EndTurn", actorId: playerId },
-        });
+        // NOT_YOUR_TURN means we're out of sync — sending EndTurn would also be
+        // rejected, causing an infinite loop.  Just wait for the next snapshot.
+        if (msg.code !== "NOT_YOUR_TURN") {
+          send({
+            type: "Intent",
+            clientSeq: clientSeq++,
+            intent: { type: "EndTurn", actorId: playerId },
+          });
+        }
       }
     });
 
