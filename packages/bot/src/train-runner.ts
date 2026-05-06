@@ -11,6 +11,7 @@ export interface EpisodeResult {
   agentSteps: number;
   turns: number;
   winner: string | null | undefined;
+  timedOut?: boolean;
 }
 
 function wsUrl(serverUrl: string, token: string): string {
@@ -21,16 +22,6 @@ function wsUrl(serverUrl: string, token: string): string {
   return u.toString();
 }
 
-/**
- * Plays one training episode via WebSocket, updating the Q-agent online.
- *
- * For each action taken:
- *   - Records (prevView, intent)
- *   - When the next Snapshot arrives, completes the transition with reward and nextView
- *   - Calls agent.update() immediately (online TD learning)
- *
- * Returns after the match finishes. Caller should call agent.endEpisode() for ε decay.
- */
 export async function runTrainingEpisode(opts: {
   serverUrl: string;
   matchId: string;
@@ -40,10 +31,17 @@ export async function runTrainingEpisode(opts: {
   content: ContentPack;
   rewardFn: RewardFn;
   verbose?: boolean;
+  /** Abort episode after this many ms with no snapshot (default: 3 min) */
+  stallTimeoutMs?: number;
 }): Promise<EpisodeResult> {
-  const { serverUrl, matchId, agentToken, playerId, agent, content, rewardFn, verbose } = opts;
+  const {
+    serverUrl, matchId, agentToken, playerId,
+    agent, content, rewardFn, verbose,
+    stallTimeoutMs = 3 * 60 * 1000,
+  } = opts;
+
   const log = verbose
-    ? (...args: unknown[]) => console.log("[train-runner]", ...args)
+    ? (...args: unknown[]) => console.log("  [runner]", ...args)
     : () => undefined;
 
   return new Promise((resolve, reject) => {
@@ -54,16 +52,30 @@ export async function runTrainingEpisode(opts: {
     let agentReward = 0;
     let agentSteps = 0;
     let settled = false;
+    let lastSnapshotAt = Date.now();
+
+    // ── Stall watchdog ────────────────────────────────────────────────────────
+    // If no snapshot arrives for stallTimeoutMs, the game is stuck — bail out.
+    const stallTimer = setInterval(() => {
+      if (settled) { clearInterval(stallTimer); return; }
+      const stalled = Date.now() - lastSnapshotAt;
+      if (stalled > stallTimeoutMs) {
+        clearInterval(stallTimer);
+        console.log(`  [runner] no snapshot for ${Math.round(stalled / 1000)}s — episode timed out`);
+        finish({ agentReward, agentSteps, turns: 0, winner: undefined, timedOut: true });
+      }
+    }, 5_000);
 
     function finish(result: EpisodeResult): void {
       if (settled) return;
       settled = true;
-      ws.close();
+      clearInterval(stallTimer);
+      try { ws.close(); } catch { /* ignore */ }
       resolve(result);
     }
 
     function send(msg: object): void {
-      ws.send(JSON.stringify(msg));
+      try { ws.send(JSON.stringify(msg)); } catch { /* ignore if closed */ }
     }
 
     function isMyTurn(state: MatchView): boolean {
@@ -73,19 +85,11 @@ export async function runTrainingEpisode(opts: {
       );
     }
 
-    /** Complete the pending (prevView, intent) → (reward, nextView) transition. */
     function completeTransition(nextView: MatchView | null): void {
       if (!pendingPrev || !pendingIntent) return;
-      const safeNext = nextView ?? pendingPrev; // fallback for reward calc
+      const safeNext = nextView ?? pendingPrev;
       const reward = rewardFn(pendingPrev, safeNext, playerId);
-      const transition = makeTransition(
-        pendingPrev,
-        playerId,
-        pendingIntent,
-        reward,
-        nextView,
-        content,
-      );
+      const transition = makeTransition(pendingPrev, playerId, pendingIntent, reward, nextView, content);
       agent.update(transition);
       agentReward += reward;
       agentSteps++;
@@ -100,35 +104,26 @@ export async function runTrainingEpisode(opts: {
 
     ws.on("message", (raw) => {
       let msg: { type: string; state?: MatchView; [k: string]: unknown };
-      try {
-        msg = JSON.parse(String(raw)) as typeof msg;
-      } catch {
-        return;
-      }
+      try { msg = JSON.parse(String(raw)) as typeof msg; } catch { return; }
 
       if (msg.type === "Snapshot") {
+        lastSnapshotAt = Date.now();
         const state = msg.state as MatchView;
         log(`turn=${state.turnNumber} status=${state.status} myTurn=${isMyTurn(state)}`);
 
-        // Complete pending transition now that we have the next state
         if (pendingPrev && pendingIntent) {
           completeTransition(state.status === "finished" ? null : state);
         }
 
         if (state.status === "finished") {
-          finish({
-            agentReward,
-            agentSteps,
-            turns: state.turnNumber,
-            winner: state.winnerId ?? null,
-          });
+          finish({ agentReward, agentSteps, turns: state.turnNumber, winner: state.winnerId ?? null });
           return;
         }
 
         if (isMyTurn(state)) {
           const legal = getLegalIntents(state, playerId, content);
           if (legal.length === 0) return;
-          const intent = agent.selectIntent(legal, state, playerId, true /* training */);
+          const intent = agent.selectIntent(legal, state, playerId, true);
           pendingPrev = state;
           pendingIntent = intent;
           send({ type: "Intent", clientSeq: clientSeq++, intent });
@@ -137,18 +132,16 @@ export async function runTrainingEpisode(opts: {
 
       if (msg.type === "IntentReject") {
         if (settled) return;
-        log(`intent rejected: ${msg.code}`);
+        log(`intent rejected: ${String(msg.code)}`);
         pendingPrev = null;
         pendingIntent = null;
-        // NOT_YOUR_TURN means we're out of sync — sending EndTurn would also be
-        // rejected, causing an infinite loop.  Just wait for the next snapshot.
         if (msg.code !== "NOT_YOUR_TURN") {
-          send({
-            type: "Intent",
-            clientSeq: clientSeq++,
-            intent: { type: "EndTurn", actorId: playerId },
-          });
+          send({ type: "Intent", clientSeq: clientSeq++, intent: { type: "EndTurn", actorId: playerId } });
         }
+      }
+
+      if (msg.type === "Error") {
+        console.log(`  [runner] server error: ${String(msg.code)} — ${String(msg.message)}`);
       }
     });
 

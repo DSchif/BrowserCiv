@@ -141,8 +141,17 @@ async function main(): Promise<void> {
 
   if (!NO_SPAWN) {
     console.log("Starting server and client...");
-    procs.push(spawn("pnpm", ["dev:server"], { cwd: ROOT, stdio: "ignore", shell: false }));
+
+    // Pipe server stderr so errors surface (stdout is noisy startup logs — drop it)
+    const serverProc = spawn("pnpm", ["dev:server"], { cwd: ROOT, stdio: ["ignore", "ignore", "pipe"], shell: false });
+    serverProc.stderr?.on("data", (d: Buffer) => {
+      const line = d.toString().trim();
+      if (line) console.error(`  [server] ${line}`);
+    });
+    procs.push(serverProc);
+
     procs.push(spawn("pnpm", ["dev:client"], { cwd: ROOT, stdio: "ignore", shell: false }));
+
     await waitForUrl(`${SERVER_URL}/health`, "server");
     await waitForUrl(CLIENT_URL, "client");
     console.log();
@@ -190,6 +199,7 @@ async function main(): Promise<void> {
 
     await trainStart(setup.matchId, setup.agentToken.token, setup.opponentId, setup.strategy);
 
+    console.log("  Game running…\n");
     const result = await runTrainingEpisode({
       serverUrl: SERVER_URL,
       matchId:   setup.matchId,
@@ -198,6 +208,8 @@ async function main(): Promise<void> {
       agent,
       content,
       rewardFn: cityAndUnitReward,
+      verbose: true,
+      stallTimeoutMs: 3 * 60 * 1000,
     });
 
     agent.endEpisode(result.agentReward, {
@@ -208,7 +220,8 @@ async function main(): Promise<void> {
 
     const won  = result.winner === setup.agentToken.playerId;
     const lost = result.winner != null && !won;
-    const outcome = won ? "WON" : lost ? "LOST" : "DRAW / timeout";
+    const outcome = result.timedOut ? "TIMED OUT (stalled)"
+      : won ? "WON" : lost ? "LOST" : "DRAW / max turns";
 
     console.log(`  Result:  ${outcome}`);
     console.log(`  Turns:   ${result.turns}  Steps: ${result.agentSteps}  Reward: ${result.agentReward.toFixed(2)}`);
