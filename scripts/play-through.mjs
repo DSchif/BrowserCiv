@@ -237,7 +237,7 @@ async function main() {
   log.push({ step: "set-research-bronze_working", setResearch });
   await pageA.waitForTimeout(300);
   // Open Tech panel and screenshot
-  await pageA.click("#tech");
+  await pageA.click("#science-btn");
   await pageA.waitForTimeout(300);
   await shot(pageA, "alice", "05-tech-panel");
   await pageA.click("#tp-close");
@@ -264,7 +264,7 @@ async function main() {
   }
   await shot(pageA, "alice", "06-after-30-rounds");
   await shot(pageB, "bob", "07-after-30-rounds-bob");
-  await pageA.click("#tech");
+  await pageA.click("#science-btn");
   await pageA.waitForTimeout(300);
   await shot(pageA, "alice", "08-tech-panel-after-30-rounds");
   await pageA.click("#tp-close");
