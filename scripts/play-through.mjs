@@ -127,7 +127,7 @@ async function main() {
   await pageA.fill("#name", "Alice");
   await pageA.selectOption("#size", SIZE);
   await pageA.click("#create");
-  await pageA.waitForSelector("#hud");
+  await pageA.waitForSelector("#lobby-overlay:not(.hidden)");
 
   await pageB.goto(URL);
   await pageB.waitForSelector("#name");
@@ -135,15 +135,15 @@ async function main() {
   await pageB.click("#refresh");
   await pageB.waitForSelector("button.join");
   await pageB.click("button.join");
-  await pageB.waitForSelector("#hud");
+  await pageB.waitForSelector("#lobby-overlay:not(.hidden)");
   await pageA.waitForTimeout(400);
 
   // Start
   await pageA.waitForFunction(() => {
-    const b = document.querySelector("#start");
+    const b = document.querySelector("#lo-start");
     return b && !b.hasAttribute("disabled");
   });
-  await pageA.click("#start");
+  await pageA.click("#lo-start");
   await pageA.waitForTimeout(1000);
 
   await shot(pageA, "alice", "01-match-started");
