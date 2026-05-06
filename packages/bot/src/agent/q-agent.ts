@@ -1,9 +1,8 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { ContentPack, Intent, MatchView } from "@browserciv/shared";
 import { getLegalIntents } from "@browserciv/shared";
-import { intentFeatures, actionCategoryFeatures, extractFeatures } from "./features.js";
-import { MLP } from "./mlp.js";
-import type { MLPWeights } from "./mlp.js";
+import { intentFeatures, actionCategoryFeatures, extractFeatures, TOTAL_FEATURE_SIZE } from "./features.js";
+import { MLP, type LayerCache, type MLPWeights } from "./mlp.js";
 import type { RewardFn } from "./reward.js";
 
 export interface QAgentConfig {
@@ -54,15 +53,17 @@ interface Transition {
  */
 export class QAgent {
   private net: MLP;
+  private hidden: number[];
   config: QAgentConfig;
   epsilon: number;
   totalUpdates = 0;
   episodeHistory: EpisodeRecord[] = [];
 
-  constructor(config: Partial<QAgentConfig> = {}) {
+  constructor(config: Partial<QAgentConfig> = {}, hidden: number[] = [64, 32]) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.epsilon = this.config.epsilon;
-    this.net = new MLP();
+    this.hidden = hidden;
+    this.net = new MLP(TOTAL_FEATURE_SIZE, hidden);
   }
 
   qValue(view: MatchView, playerId: string, intentType: string): number {
@@ -108,7 +109,7 @@ export class QAgent {
     }
 
     const error = targetQ - currentQ;
-    this.net.tdUpdate(cache, error, this.config.lr);
+    this.net.tdUpdate(cache as LayerCache[], error, this.config.lr);
     this.totalUpdates++;
   }
 
@@ -145,15 +146,40 @@ export class QAgent {
   }
 
   load(path: string): void {
+    if (!existsSync(path)) return;
     const data = JSON.parse(readFileSync(path, "utf8")) as {
-      net: MLPWeights;
-      epsilon: number;
-      totalUpdates: number;
+      net?: MLPWeights;
+      epsilon?: number;
+      totalUpdates?: number;
       episodeHistory?: EpisodeRecord[];
     };
+
+    if (!data.net?.layers) {
+      console.log("[QAgent] old agent format — starting fresh");
+      return;
+    }
+
+    if (data.net.layers[0]?.inSize !== TOTAL_FEATURE_SIZE) {
+      console.warn(
+        `[QAgent] feature size mismatch: saved=${data.net.layers[0]?.inSize} expected=${TOTAL_FEATURE_SIZE} — starting fresh`,
+      );
+      return;
+    }
+
+    const savedHidden = data.net.layers.slice(0, -1).map((l) => l.outSize);
+    if (
+      savedHidden.length !== this.hidden.length ||
+      savedHidden.some((v, i) => v !== this.hidden[i])
+    ) {
+      console.warn(
+        `[QAgent] hidden layer mismatch: saved=[${savedHidden.join(",")}] expected=[${this.hidden.join(",")}] — starting fresh`,
+      );
+      return;
+    }
+
     this.net = MLP.fromJSON(data.net);
-    this.epsilon = data.epsilon;
-    this.totalUpdates = data.totalUpdates;
+    this.epsilon = data.epsilon ?? this.epsilon;
+    this.totalUpdates = data.totalUpdates ?? 0;
     this.episodeHistory = data.episodeHistory ?? [];
   }
 

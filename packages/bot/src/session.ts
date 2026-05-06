@@ -21,14 +21,15 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import { dirname, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import type { ContentPack } from "@browserciv/shared";
+import type { AgentConfig } from "./agent/agent-config.js";
 import { QAgent } from "./agent/q-agent.js";
-import { cityAndUnitReward } from "./agent/reward.js";
+import { cityAndUnitReward, buildRewardFn } from "./agent/reward.js";
 import { runTrainingEpisode } from "./train-runner.js";
 
 // Root of the monorepo (packages/bot/src → packages/bot → packages → root)
@@ -42,6 +43,7 @@ function arg(name: string): string | undefined {
 }
 function flag(name: string): boolean { return process.argv.includes(name); }
 
+const CONFIG_PATH = arg("--config");
 const EPISODES  = parseInt(arg("--episodes") ?? "20", 10);
 const LOAD_PATH = arg("--load");
 const SAVE_PATH = arg("--save") ?? "agent.json";
@@ -116,7 +118,7 @@ async function trainStart(
   const res = await fetch(`${SERVER_URL}/train-start`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ matchId, agentToken, opponentId, strategy, noFog: true }),
+    body: JSON.stringify({ matchId, agentToken, opponentId, strategy }),
   });
   if (!res.ok) throw new Error(`train-start failed: ${res.status} ${await res.text()}`);
 }
@@ -171,7 +173,32 @@ async function main(): Promise<void> {
 
   // ── Load or create agent ──────────────────────────────────────────────────
 
-  const agent = new QAgent({ lr: LR });
+  let agentConfig: AgentConfig | null = null;
+  const configFile = CONFIG_PATH ?? (existsSync("agent-config.json") ? "agent-config.json" : null);
+  if (configFile && existsSync(configFile)) {
+    agentConfig = JSON.parse(readFileSync(configFile, "utf8")) as AgentConfig;
+    console.log(`Loaded agent config from ${configFile}\n`);
+  }
+
+  const hidden = agentConfig?.network.hidden ?? [64, 32];
+  const rewardFn = agentConfig?.rewards.length
+    ? buildRewardFn(agentConfig.rewards)
+    : cityAndUnitReward;
+  const lr = agentConfig?.training.lr ?? LR;
+  const epsilonDecay = agentConfig?.training.epsilon_decay;
+  const epsilonMin = agentConfig?.training.epsilon_min;
+  const gamma = agentConfig?.training.gamma;
+
+  const agent = new QAgent(
+    {
+      lr,
+      ...(epsilonDecay !== undefined ? { epsilonDecay } : {}),
+      ...(epsilonMin !== undefined ? { epsilonMin } : {}),
+      ...(gamma !== undefined ? { gamma } : {}),
+      rewardFn,
+    },
+    hidden,
+  );
 
   if (LOAD_PATH) {
     if (existsSync(LOAD_PATH)) {
@@ -201,7 +228,7 @@ async function main(): Promise<void> {
 
     const setup = await trainSetup();
     const watchUrl =
-      `http://${lanIp}:5173?spectateMatch=${setup.matchId}&token=${setup.spectatorToken.token}`;
+      `http://${lanIp}:5173?spectateMatch=${setup.matchId}&token=${setup.spectatorToken.token}&agentId=${setup.agentToken.playerId}`;
 
     console.log("  Watch URL (open this in your browser):\n");
     console.log(`    ${watchUrl}\n`);
@@ -219,7 +246,7 @@ async function main(): Promise<void> {
       playerId:   setup.agentToken.playerId,
       agent,
       content,
-      rewardFn: cityAndUnitReward,
+      rewardFn,
       verbose: true,
       stallTimeoutMs: 3 * 60 * 1000,
     });

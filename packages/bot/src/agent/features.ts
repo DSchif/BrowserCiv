@@ -1,6 +1,6 @@
 import type { MatchView } from "@browserciv/shared";
 
-export const FEATURE_SIZE = 9;
+export const FEATURE_SIZE = 10;
 
 /**
  * Converts a MatchView into a fixed-length numeric feature vector.
@@ -16,7 +16,8 @@ export const FEATURE_SIZE = 9;
  *   5    1 if research is active, else 0
  *   6    my gold / 200
  *   7    fraction of map tiles I own
- *   8    bias = 1.0
+ *   8    fraction of map tiles seen (visibility !== "unseen")
+ *   9    bias = 1.0
  */
 export function extractFeatures(view: MatchView, playerId: string): number[] {
   const me = view.players.find((p) => p.id === playerId);
@@ -25,6 +26,7 @@ export function extractFeatures(view: MatchView, playerId: string): number[] {
   const totalTiles = view.map?.tiles.length ?? 1;
   const ownedTiles = view.map?.tiles.filter((t) => t.ownerCityId &&
     myCities.some((c) => c.id === t.ownerCityId)).length ?? 0;
+  const seenTiles = view.map?.tiles.filter((t) => t.visibility !== "unseen").length ?? 0;
 
   return [
     view.turnNumber / 100,
@@ -35,6 +37,7 @@ export function extractFeatures(view: MatchView, playerId: string): number[] {
     me?.currentTech ? 1 : 0,
     (me?.gold ?? 0) / 200,
     ownedTiles / totalTiles,
+    seenTiles / totalTiles,
     1.0,
   ];
 }
