@@ -101,6 +101,7 @@ export function reduce(
       mapSize: action.mapSize,
       diplomacy: {},
       wondersBuilt: {},
+      noFog: false,
     };
   }
 
@@ -289,6 +290,7 @@ export function reduce(
         startedAt: action.startedAt,
         units,
         nextUnitId,
+        noFog: action.noFog ?? prev.noFog,
         log: appendLog(prev, seq, `Match started — turn 1, ${players[0]!.name} to act`),
       };
       return rememberVisibleAll(next);

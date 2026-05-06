@@ -56,6 +56,7 @@ export class MatchRuntime {
           type: "MatchStart",
           actorId: intent.actorId,
           startedAt: new Date().toISOString(),
+          noFog: intent.noFog,
         };
         break;
       case "EndTurn":

@@ -16,7 +16,9 @@ export function buildView(
   viewerId: string,
   content?: ContentPack,
 ): MatchView {
-  const visible = currentlyVisibleFor(state, viewerId);
+  const visible = state.noFog
+    ? new Set(state.map?.tiles.map((t) => hexKey({ q: t.q, r: t.r })) ?? [])
+    : currentlyVisibleFor(state, viewerId);
   const seen = new Set(state.seenTiles[viewerId] ?? []);
   const viewer = state.players.find((p) => p.id === viewerId);
   const visibleResources = viewer && content ? visibleResourcesFor(viewer, content) : null;

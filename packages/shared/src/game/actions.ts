@@ -48,6 +48,7 @@ export const ActionMatchStart = z.object({
   type: z.literal("MatchStart"),
   actorId: z.string().min(1),
   startedAt: z.string(),
+  noFog: z.boolean().optional(),
 });
 
 export const ActionEndTurn = z.object({
@@ -178,7 +179,7 @@ export const Action = z.discriminatedUnion("type", [
 export type Action = z.infer<typeof Action>;
 
 export const Intent = z.discriminatedUnion("type", [
-  ActionMatchStart.pick({ type: true, actorId: true }),
+  ActionMatchStart.pick({ type: true, actorId: true, noFog: true }),
   ActionEndTurn.pick({ type: true, actorId: true }),
   ActionMoveUnit.pick({ type: true, actorId: true, unitId: true, target: true, attackId: true }),
   ActionFoundCity.pick({ type: true, actorId: true, unitId: true }),

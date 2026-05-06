@@ -146,6 +146,8 @@ export interface MatchState {
   cityCounters: Record<string, number>;
   /** Map size chosen at match creation. */
   mapSize: MapSize;
+  /** When true, all tiles are always visible to all players (no fog of war). */
+  noFog: boolean;
 }
 
 export interface MatchLogEntry {

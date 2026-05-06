@@ -1,6 +1,6 @@
 import type { City, ContentPack, MapView, MatchView, PathfindResult, Player, Unit } from "@browserciv/shared";
 import { Hex } from "@browserciv/shared";
-import { Application, Container, Graphics, Text } from "pixi.js";
+import { Application, Assets, Container, Graphics, Sprite, Text, Texture } from "pixi.js";
 
 type AxialCoord = Hex.AxialCoord;
 
@@ -20,6 +20,27 @@ const TERRAIN_COLOR: Record<string, number> = {
   deep_ocean: 0x163763,
   mountain: 0x6e6e6e,
 };
+
+// Terrains that have sprite assets. Others fall back to TERRAIN_COLOR fills.
+const TERRAIN_SPRITE: Record<string, string> = {
+  grassland:  "/assets/hex-grass-land.png",
+  hills:      "/assets/hex-grass-hill.png",
+  forest:     "/assets/hex-forest-land.png",
+  desert:     "/assets/hex-desert-land.png",
+  jungle:     "/assets/hex-jungle-land.png",
+  mountain:   "/assets/hex-mountain.png",
+  coast:      "/assets/hex-water.png",
+  ocean:      "/assets/hex-water.png",
+  deep_ocean: "/assets/hex-deep-water.png",
+};
+
+// Flat-top → pointy-top rotation + scale to fit HEX_SIZE
+const SPRITE_ROTATION = 0;
+const SPRITE_SCALE = (HEX_SIZE * 2) / 256;
+
+export async function preloadTerrainAssets(): Promise<void> {
+  await Assets.load(Object.values(TERRAIN_SPRITE));
+}
 
 const UNIT_GLYPH: Record<string, string> = {
   "unit.warrior": "⚔",
@@ -401,28 +422,45 @@ export class MapViewer {
     this.hexLayer.removeChildren();
     for (const tile of map.tiles) {
       const { x, y } = Hex.axialToPixel({ q: tile.q, r: tile.r }, HEX_SIZE);
-      const baseColor = TERRAIN_COLOR[tile.terrain] ?? 0x444444;
-      let alpha = 0.92;
-      let fill = baseColor;
-      if (tile.visibility === "unseen") {
-        fill = 0x0a0d12;
-        alpha = 0.95;
-      } else if (tile.visibility === "seen") {
-        fill = darken(baseColor, 0.45);
-        alpha = 0.65;
-      }
-      const hex = drawHexFill(HEX_SIZE - 1, fill, alpha);
-      hex.x = x;
-      hex.y = y;
-      hex.eventMode = "static";
-      hex.cursor = "pointer";
       const coord: AxialCoord = { q: tile.q, r: tile.r };
-      hex.on("pointertap", (e) => {
-        this.callbacks.onTileClick?.(coord, e.ctrlKey || e.metaKey);
-      });
-      hex.on("pointerover", () => this.callbacks.onTileHover?.(coord));
-      hex.on("pointerout", () => this.callbacks.onTileHover?.(null));
-      this.hexLayer.addChild(hex);
+      const spritePath = tile.visibility !== "unseen" ? TERRAIN_SPRITE[tile.terrain] : undefined;
+      const texture = spritePath ? (Assets.get(spritePath) as Texture | undefined) : undefined;
+
+      if (texture) {
+        const s = new Sprite(texture);
+        s.anchor.set(0.5);
+        s.scale.set(SPRITE_SCALE);
+        s.rotation = SPRITE_ROTATION;
+        s.x = x;
+        s.y = y;
+        if (tile.visibility === "seen") s.tint = 0x505050;
+        s.eventMode = "static";
+        s.cursor = "pointer";
+        s.on("pointertap", (e) => this.callbacks.onTileClick?.(coord, e.ctrlKey || e.metaKey));
+        s.on("pointerover", () => this.callbacks.onTileHover?.(coord));
+        s.on("pointerout", () => this.callbacks.onTileHover?.(null));
+        this.hexLayer.addChild(s);
+      } else {
+        const baseColor = TERRAIN_COLOR[tile.terrain] ?? 0x444444;
+        let alpha = 0.92;
+        let fill = baseColor;
+        if (tile.visibility === "unseen") {
+          fill = 0x0a0d12;
+          alpha = 0.95;
+        } else if (tile.visibility === "seen") {
+          fill = darken(baseColor, 0.45);
+          alpha = 0.65;
+        }
+        const hex = drawHexFill(HEX_SIZE - 1, fill, alpha);
+        hex.x = x;
+        hex.y = y;
+        hex.eventMode = "static";
+        hex.cursor = "pointer";
+        hex.on("pointertap", (e) => this.callbacks.onTileClick?.(coord, e.ctrlKey || e.metaKey));
+        hex.on("pointerover", () => this.callbacks.onTileHover?.(coord));
+        hex.on("pointerout", () => this.callbacks.onTileHover?.(null));
+        this.hexLayer.addChild(hex);
+      }
     }
   }
 
