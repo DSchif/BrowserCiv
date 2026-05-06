@@ -58,6 +58,7 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
           <div class="lo-bot-row">
             <select id="lo-bot-type">
               <option value="random">Random bot</option>
+              <option value="passive">Passive bot (ends turn only)</option>
             </select>
             <button class="lo-add-bot" id="lo-add-bot">+ Add Bot</button>
           </div>

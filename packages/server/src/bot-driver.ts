@@ -60,8 +60,12 @@ const randomBrain: Brain = (state: MatchView, playerId: string): Intent | null =
   return { type: "EndTurn", actorId: playerId };
 };
 
+const passiveBrain: Brain = (_state, playerId) =>
+  ({ type: "EndTurn", actorId: playerId });
+
 export const STRATEGIES: Record<string, Brain> = {
   random: randomBrain,
+  passive: passiveBrain,
 };
 
 // ── BotDriver ────────────────────────────────────────────────────────────────
