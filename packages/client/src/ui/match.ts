@@ -55,6 +55,12 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
         <div class="lo-waiting" id="lo-waiting">Waiting for players…</div>
         <div class="lo-settings hidden" id="lo-settings">
           <label class="lo-setting"><input type="checkbox" id="lo-no-fog"> No fog of war</label>
+          <div class="lo-bot-row">
+            <select id="lo-bot-type">
+              <option value="random">Random bot</option>
+            </select>
+            <button class="lo-add-bot" id="lo-add-bot">+ Add Bot</button>
+          </div>
         </div>
         <div class="lo-actions">
           <button class="lo-start" id="lo-start" disabled>Start Match</button>
@@ -137,6 +143,8 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
   const loStart = root.querySelector<HTMLButtonElement>("#lo-start")!;
   const loNoFog = root.querySelector<HTMLInputElement>("#lo-no-fog")!;
   const loSettings = root.querySelector<HTMLDivElement>("#lo-settings")!;
+  const loBotType = root.querySelector<HTMLSelectElement>("#lo-bot-type")!;
+  const loAddBot = root.querySelector<HTMLButtonElement>("#lo-add-bot")!;
   const loCopy = root.querySelector<HTMLButtonElement>("#lo-copy")!;
   const loLeaveLobby = root.querySelector<HTMLButtonElement>("#lo-leave-lobby")!;
   const statusDot = root.querySelector<HTMLSpanElement>("#status-dot")!;
@@ -245,6 +253,16 @@ export function renderMatch(root: HTMLElement, session: MatchSession, onLeave: (
 
   loStart.addEventListener("click", () => {
     client.sendIntent({ type: "MatchStart", actorId: session.playerId, noFog: loNoFog.checked });
+  });
+  loAddBot.addEventListener("click", () => {
+    loAddBot.disabled = true;
+    fetch(`/matches/${session.matchId}/bots`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ strategy: loBotType.value }),
+    })
+      .catch((e: unknown) => console.error("add-bot failed", e))
+      .finally(() => { loAddBot.disabled = false; });
   });
   loLeaveLobby.addEventListener("click", () => {
     client.close();

@@ -28,15 +28,22 @@ export function setApplyListener(fn: ((rt: MatchRuntime) => void) | null): void 
 
 export class MatchRuntime {
   private conns = new Set<SocketConn>();
+  private stateListeners = new Set<(rt: MatchRuntime) => void>();
 
   constructor(
     public state: MatchState,
     public readonly content: ContentPack,
   ) {}
 
+  addStateListener(fn: (rt: MatchRuntime) => void): () => void {
+    this.stateListeners.add(fn);
+    return () => this.stateListeners.delete(fn);
+  }
+
   apply(action: Action): MatchState {
     this.state = reduce(this.state, action, this.content);
     onApply?.(this);
+    for (const fn of this.stateListeners) fn(this);
     return this.state;
   }
 
