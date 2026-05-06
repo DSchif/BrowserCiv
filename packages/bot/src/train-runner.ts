@@ -135,7 +135,12 @@ export async function runTrainingEpisode(opts: {
         log(`intent rejected: ${String(msg.code)}`);
         pendingPrev = null;
         pendingIntent = null;
-        if (msg.code !== "NOT_YOUR_TURN") {
+        if (msg.code === "NOT_YOUR_TURN") {
+          // Re-sync: the server might already be on our turn waiting for us,
+          // meaning we'd deadlock waiting for a snapshot that never comes.
+          // Hello always triggers a fresh snapshot of the real current state.
+          send({ type: "Hello", matchId, playerId, lastSeq: 0 });
+        } else {
           send({ type: "Intent", clientSeq: clientSeq++, intent: { type: "EndTurn", actorId: playerId } });
         }
       }
