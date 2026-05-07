@@ -121,8 +121,13 @@ async function main() {
   const pageB = await ctxB.newPage();
   attachErrors(pageB, "B");
 
-  // Lobby flow
+  // Lobby flow — register test users then proceed to lobby
   await pageA.goto(URL);
+  await pageA.waitForSelector('button[data-tab="register"]');
+  await pageA.click('button[data-tab="register"]');
+  await pageA.fill("#reg-username", `ptAlice${Date.now()}`);
+  await pageA.fill("#reg-password", "testpass");
+  await pageA.click("#reg-submit");
   await pageA.waitForSelector("#name");
   await pageA.fill("#name", "Alice");
   await pageA.selectOption("#size", SIZE);
@@ -130,6 +135,11 @@ async function main() {
   await pageA.waitForSelector("#lobby-overlay:not(.hidden)");
 
   await pageB.goto(URL);
+  await pageB.waitForSelector('button[data-tab="register"]');
+  await pageB.click('button[data-tab="register"]');
+  await pageB.fill("#reg-username", `ptBob${Date.now()}`);
+  await pageB.fill("#reg-password", "testpass");
+  await pageB.click("#reg-submit");
   await pageB.waitForSelector("#name");
   await pageB.fill("#name", "Bob");
   await pageB.click("#refresh");
