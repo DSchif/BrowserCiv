@@ -141,4 +141,5 @@ jobs:
           aws-region: us-east-1
 
       - name: CDK deploy
-        run: pnpm --filter @browserciv/infra run deploy -- BrowserCivStack --require-approval never
+        working-directory: packages/infra
+        run: pnpm exec cdk deploy BrowserCivStack --require-approval never
