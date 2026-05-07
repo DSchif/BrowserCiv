@@ -8,8 +8,11 @@ function expect(name, cond, detail = "") {
   console.log(`  [${cond ? "PASS" : "FAIL"}] ${name}${detail ? " — " + detail : ""}`);
 }
 
+let authToken = null;
 async function post(path, body) {
-  const r = await fetch(SERVER + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const headers = { "content-type": "application/json" };
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+  const r = await fetch(SERVER + path, { method: "POST", headers, body: JSON.stringify(body) });
   return r.json();
 }
 
@@ -25,6 +28,8 @@ function attach(token, store) {
 }
 
 async function main() {
+  const reg = await post("/account/register", { username: `e2e_p2_${Date.now()}`, password: "testpass" });
+  authToken = reg.token;
   console.log("--- create + join ---");
   const a = await post("/matches", { hostName: "Alice" });
   const b = await post(`/matches/${a.match.id}/join`, { name: "Bob" });
