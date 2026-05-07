@@ -16,6 +16,8 @@ export default defineConfig({
     host: true,
     proxy: {
       "/matches": backendProxy,
+      "/account": backendProxy,
+      "/admin": backendProxy,
       "/content-pack": backendProxy,
       "/health": backendProxy,
       "/ws": { ...backendProxy, ws: true },
@@ -28,6 +30,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/matches": backendProxy,
+      "/account": backendProxy,
+      "/admin": backendProxy,
       "/content-pack": backendProxy,
       "/health": backendProxy,
       "/ws": { ...backendProxy, ws: true },
