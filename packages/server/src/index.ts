@@ -16,6 +16,7 @@ import {
   persistTokens,
 } from "./persistence.js";
 import { registerAccountRoutes } from "./routes/account.js";
+import { registerAdminRoutes } from "./routes/admin.js";
 import { registerMatchRoutes } from "./routes/matches.js";
 import { setApplyListener } from "./runtime.js";
 import { registerWsRoutes } from "./ws.js";
@@ -70,6 +71,7 @@ app.get("/health", async () => ({ status: "ok" }));
 app.get("/content-pack", async () => content);
 
 await registerAccountRoutes(app);
+await registerAdminRoutes(app);
 await registerMatchRoutes(app);
 await registerWsRoutes(app);
 
@@ -109,7 +111,7 @@ if (CLIENT_DIST && fs.existsSync(CLIENT_DIST)) {
     wildcard: false,
   });
   // SPA fallback: any non-API path gets index.html so client-side routing works.
-  const API_PREFIXES = ["/matches", "/health", "/content-pack", "/ws", "/account", "/train", "/sim", "/agents", "/runs"];
+  const API_PREFIXES = ["/matches", "/health", "/content-pack", "/ws", "/account", "/admin", "/train", "/sim", "/agents", "/runs"];
   app.setNotFoundHandler((req, reply) => {
     if (API_PREFIXES.some((p) => req.url === p || req.url.startsWith(p + "/"))) {
       reply.code(404).send({ error: "not found" });

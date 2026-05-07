@@ -2,6 +2,7 @@ export interface AuthSession {
   token: string;
   username: string;
   isGuest: boolean;
+  isAdmin?: boolean;
 }
 
 const TOKEN_KEY = "browserciv_token";
@@ -13,16 +14,16 @@ export function loadSession(): AuthSession | null {
   if (!token || !username) return null;
   // Check JWT expiry without a library: decode the payload (middle segment).
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]!)) as { exp?: number };
+    const payload = JSON.parse(atob(token.split(".")[1]!)) as { exp?: number; isAdmin?: boolean };
     if (payload.exp && payload.exp * 1000 < Date.now()) {
       clearSession();
       return null;
     }
+    return { token, username, isGuest: false, isAdmin: payload.isAdmin === true };
   } catch {
     clearSession();
     return null;
   }
-  return { token, username, isGuest: false };
 }
 
 export function saveSession(token: string, username: string): void {

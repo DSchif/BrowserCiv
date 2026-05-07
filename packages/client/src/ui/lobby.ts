@@ -12,9 +12,9 @@ export interface LobbyResult {
 export function renderLobby(
   root: HTMLElement,
   onPicked: (r: LobbyResult) => void,
-  opts: { isGuest?: boolean; username?: string; onSim?: () => void; onSignOut?: () => void } = {},
+  opts: { isGuest?: boolean; username?: string; isAdmin?: boolean; onSim?: () => void; onAdmin?: () => void; onSignOut?: () => void } = {},
 ): void {
-  const { isGuest = false, username = "", onSim, onSignOut } = opts;
+  const { isGuest = false, username = "", isAdmin = false, onSim, onAdmin, onSignOut } = opts;
 
   if (isGuest) {
     renderGuestLobby(root, onPicked);
@@ -27,6 +27,7 @@ export function renderLobby(
         <h1>BrowserCiv</h1>
         <div class="lobby-user">
           <span class="dim">Signed in as <strong>${escapeHtml(username)}</strong></span>
+          ${isAdmin ? `<button id="admin-btn" class="btn-link">Admin</button>` : ""}
           <button id="sign-out" class="btn-link">Sign out</button>
         </div>
       </div>
@@ -110,6 +111,7 @@ export function renderLobby(
   });
 
   if (onSim) root.querySelector<HTMLButtonElement>("#sim-btn")?.addEventListener("click", onSim);
+  if (onAdmin) root.querySelector<HTMLButtonElement>("#admin-btn")?.addEventListener("click", onAdmin);
 
   root.querySelector<HTMLButtonElement>("#sign-out")?.addEventListener("click", () => {
     clearSession();

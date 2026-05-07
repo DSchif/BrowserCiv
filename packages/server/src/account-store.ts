@@ -5,6 +5,8 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  ScanCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
 export interface UserRecord {
@@ -12,6 +14,7 @@ export interface UserRecord {
   username: string;
   passwordHash: string;
   createdAt: string;
+  isAdmin?: boolean;
 }
 
 // ── DynamoDB ──────────────────────────────────────────────────────────────────
@@ -39,6 +42,28 @@ async function ddbGet(username: string): Promise<UserRecord | null> {
   if (!res.Item) return null;
   const { pk: _pk, ...rest } = res.Item as { pk: string } & UserRecord;
   return rest;
+}
+
+async function ddbList(): Promise<UserRecord[]> {
+  const c = getClient();
+  if (!c) return [];
+  const res = await c.doc.send(new ScanCommand({
+    TableName: c.table,
+    FilterExpression: "begins_with(pk, :prefix)",
+    ExpressionAttributeValues: { ":prefix": "user#" },
+  }));
+  return (res.Items ?? []).map(({ pk: _pk, ...rest }) => rest as UserRecord);
+}
+
+async function ddbSetAdmin(username: string, isAdmin: boolean): Promise<void> {
+  const c = getClient();
+  if (!c) return;
+  await c.doc.send(new UpdateCommand({
+    TableName: c.table,
+    Key: { pk: `user#${username.toLowerCase()}` },
+    UpdateExpression: "SET isAdmin = :v",
+    ExpressionAttributeValues: { ":v": isAdmin },
+  }));
 }
 
 // ── Local file fallback ───────────────────────────────────────────────────────
@@ -69,6 +94,21 @@ async function filePut(user: UserRecord): Promise<void> {
   await fs.rename(tmp, USERS_FILE);
 }
 
+async function fileList(): Promise<UserRecord[]> {
+  try {
+    const text = await fs.readFile(USERS_FILE, "utf8");
+    return Object.values(JSON.parse(text) as Record<string, UserRecord>);
+  } catch {
+    return [];
+  }
+}
+
+async function fileSetAdmin(username: string, isAdmin: boolean): Promise<void> {
+  const user = await fileGet(username);
+  if (!user) return;
+  await filePut({ ...user, isAdmin });
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function saveUser(user: UserRecord): Promise<void> {
@@ -84,4 +124,19 @@ export async function getUser(username: string): Promise<UserRecord | null> {
     return ddbGet(username);
   }
   return fileGet(username);
+}
+
+export async function listUsers(): Promise<UserRecord[]> {
+  if (process.env.STATE_TABLE) {
+    return ddbList();
+  }
+  return fileList();
+}
+
+export async function setUserAdmin(username: string, isAdmin: boolean): Promise<void> {
+  if (process.env.STATE_TABLE) {
+    await ddbSetAdmin(username, isAdmin);
+  } else {
+    await fileSetAdmin(username, isAdmin);
+  }
 }

@@ -1,6 +1,7 @@
 import { loadSession, renderAuth, type AuthSession } from "./ui/auth.js";
 import { renderLobby, type LobbyResult } from "./ui/lobby.js";
 import { renderMatch } from "./ui/match.js";
+import { renderAdmin } from "./ui/admin.js";
 
 const root = document.getElementById("app-root") as HTMLElement;
 
@@ -18,6 +19,7 @@ function showLobby(session?: AuthSession): void {
   renderLobby(root, (res: LobbyResult) => showMatch(res), {
     isGuest: s.isGuest,
     username: s.username,
+    isAdmin: s.isAdmin,
     onSim: s.isGuest
       ? undefined
       : () => {
@@ -25,6 +27,9 @@ function showLobby(session?: AuthSession): void {
             .then(({ renderSim }) => renderSim(root, () => showLobby()))
             .catch(console.error);
         },
+    onAdmin: s.isAdmin
+      ? () => renderAdmin(root, () => showLobby())
+      : undefined,
     onSignOut: () => showAuth(),
   });
 }
@@ -49,7 +54,14 @@ const directToken = params.get("token");
 const directAgentId = params.get("agentId") ?? undefined;
 const simMode = params.get("sim");
 
-if (simMode !== null) {
+if (params.get("admin") !== null) {
+  const s = loadSession();
+  if (!s || s.isGuest || !s.isAdmin) {
+    showAuth();
+  } else {
+    renderAdmin(root, () => showLobby());
+  }
+} else if (simMode !== null) {
   // Sim requires an authenticated (non-guest) session
   const s = loadSession();
   if (!s || s.isGuest) {
