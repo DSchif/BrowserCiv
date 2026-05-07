@@ -13,7 +13,64 @@ import { getMatch, listLobbies, putMatch } from "../match-store.js";
 import { MatchRuntime } from "../runtime.js";
 
 export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/matches", async (request, reply) => {
+  /**
+   * Single-player vs bot — no auth required. Creates, joins, and starts a
+   * match in one step so guests can jump straight in.
+   */
+  app.post("/matches/solo", async (request, reply) => {
+    const body = (request.body ?? {}) as {
+      playerName?: string;
+      mapSize?: string;
+      strategy?: string;
+    };
+    const playerName =
+      typeof body.playerName === "string" && body.playerName.trim()
+        ? body.playerName.trim()
+        : "Guest";
+    const mapSize = (
+      ["small", "medium", "large"].includes(body.mapSize ?? "")
+        ? body.mapSize
+        : "small"
+    ) as "small" | "medium" | "large";
+    const strategy =
+      typeof body.strategy === "string" && STRATEGIES[body.strategy]
+        ? body.strategy
+        : "greedy";
+
+    const content = getContentPack();
+    const matchId = nanoid(12);
+    const playerId = nanoid(16);
+    const botId = nanoid(16);
+    const seed = Math.floor(Math.random() * 0x7fffffff);
+    const now = new Date().toISOString();
+
+    const rt = new MatchRuntime({} as never, content);
+    rt.applyBootstrap({
+      type: "MatchCreate",
+      matchId,
+      hostId: playerId,
+      hostName: playerName,
+      hostCivId: content.civilizations[0]!.id as unknown as string,
+      contentPackId: content.manifest.id as unknown as string,
+      seed,
+      mapSize,
+      maxPlayers: 2,
+      createdAt: now,
+    });
+
+    const botCivId = pickAvailableCiv(rt.state, content);
+    if (!botCivId) return reply.code(500).send({ error: "NO_CIVS" });
+
+    rt.apply({ type: "PlayerJoin", playerId: botId, name: `Bot (${strategy})`, civId: botCivId });
+    rt.apply({ type: "MatchStart", actorId: playerId, startedAt: now, noFog: false });
+    new BotDriver(rt, botId, strategy);
+    putMatch(rt);
+
+    const cred = issueToken(playerId, matchId);
+    return reply.send({ match: rt.summary(), credential: cred });
+  });
+
+  app.post("/matches", { onRequest: [app.authenticate] }, async (request, reply) => {
     const parsed = CreateMatchRequest.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "BAD_REQUEST", issues: parsed.error.issues });
@@ -52,6 +109,7 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { id: string } }>(
     "/matches/:id/join",
+    { onRequest: [app.authenticate] },
     async (request, reply) => {
       const matchId = request.params.id;
       const rt = getMatch(matchId);

@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import httpProxy from "@fastify/http-proxy";
+import fastifyJwt from "@fastify/jwt";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
@@ -14,6 +15,7 @@ import {
   persistMatch,
   persistTokens,
 } from "./persistence.js";
+import { registerAccountRoutes } from "./routes/account.js";
 import { registerMatchRoutes } from "./routes/matches.js";
 import { setApplyListener } from "./runtime.js";
 import { registerWsRoutes } from "./ws.js";
@@ -25,6 +27,18 @@ const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });
 await app.register(websocket);
+
+await app.register(fastifyJwt, {
+  secret: process.env.JWT_SECRET ?? "dev-secret-change-in-production",
+});
+
+app.decorate("authenticate", async function (request, reply) {
+  try {
+    await request.jwtVerify();
+  } catch {
+    return reply.code(401).send({ error: "UNAUTHORIZED" });
+  }
+});
 
 const content = await loadContentPack();
 app.log.info(
@@ -55,13 +69,32 @@ setTokenChangeListener(() => {
 app.get("/health", async () => ({ status: "ok" }));
 app.get("/content-pack", async () => content);
 
+await registerAccountRoutes(app);
 await registerMatchRoutes(app);
 await registerWsRoutes(app);
 
 const SIM_SERVER_URL = process.env.SIM_SERVER_URL;
 if (SIM_SERVER_URL) {
+  // Sim routes require auth except SSE event streams (EventSource can't set headers).
+  const requireAuthUnlessEvents = async (
+    request: import("fastify").FastifyRequest,
+    reply: import("fastify").FastifyReply,
+  ) => {
+    if (request.url.endsWith("/events")) return;
+    try {
+      await request.jwtVerify();
+    } catch {
+      return reply.code(401).send({ error: "UNAUTHORIZED" });
+    }
+  };
+
   for (const prefix of ["/sim", "/agents", "/runs"]) {
-    await app.register(httpProxy, { upstream: SIM_SERVER_URL, prefix, rewritePrefix: prefix });
+    await app.register(httpProxy, {
+      upstream: SIM_SERVER_URL,
+      prefix,
+      rewritePrefix: prefix,
+      preHandler: requireAuthUnlessEvents,
+    });
   }
   app.log.info(`sim-server proxy → ${SIM_SERVER_URL}`);
 }
@@ -75,10 +108,10 @@ if (CLIENT_DIST && fs.existsSync(CLIENT_DIST)) {
     root: path.resolve(CLIENT_DIST),
     wildcard: false,
   });
-  // SPA fallback: any non-API path that didn't match a static file gets
-  // index.html so client-side routing works.
+  // SPA fallback: any non-API path gets index.html so client-side routing works.
+  const API_PREFIXES = ["/matches", "/health", "/content-pack", "/ws", "/account", "/train", "/sim", "/agents", "/runs"];
   app.setNotFoundHandler((req, reply) => {
-    if (req.url.startsWith("/matches") || req.url === "/health" || req.url.startsWith("/content-pack") || req.url.startsWith("/ws")) {
+    if (API_PREFIXES.some((p) => req.url === p || req.url.startsWith(p + "/"))) {
       reply.code(404).send({ error: "not found" });
       return;
     }

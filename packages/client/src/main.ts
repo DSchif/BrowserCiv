@@ -1,26 +1,38 @@
+import { loadSession, renderAuth, type AuthSession } from "./ui/auth.js";
 import { renderLobby, type LobbyResult } from "./ui/lobby.js";
 import { renderMatch } from "./ui/match.js";
-import { renderSim } from "./ui/sim.js";
 
 const root = document.getElementById("app-root") as HTMLElement;
 
-function showLobby(): void {
-  renderLobby(root, (res: LobbyResult) => {
-    showMatch(res);
-  }, () => {
-    import("./ui/sim.js").then(({ renderSim }) => renderSim(root, () => showLobby())).catch(console.error);
+function showAuth(): void {
+  renderAuth(root, (session: AuthSession) => showLobby(session));
+}
+
+function showLobby(session?: AuthSession): void {
+  const s = session ?? loadSession();
+  if (!s) {
+    showAuth();
+    return;
+  }
+
+  renderLobby(root, (res: LobbyResult) => showMatch(res), {
+    isGuest: s.isGuest,
+    username: s.username,
+    onSim: s.isGuest
+      ? undefined
+      : () => {
+          import("./ui/sim.js")
+            .then(({ renderSim }) => renderSim(root, () => showLobby()))
+            .catch(console.error);
+        },
+    onSignOut: () => showAuth(),
   });
 }
 
 function showMatch(res: LobbyResult): void {
   renderMatch(
     root,
-    {
-      matchId: res.matchId,
-      playerId: res.playerId,
-      token: res.token,
-      name: res.name,
-    },
+    { matchId: res.matchId, playerId: res.playerId, token: res.token, name: res.name },
     () => showLobby(),
     (spectatorSession) => showSpectator(spectatorSession),
   );
@@ -30,7 +42,7 @@ function showSpectator(session: import("./ui/match.js").MatchSession): void {
   renderMatch(root, session, () => showLobby());
 }
 
-// Allow direct spectator entry via ?spectateMatch=ID&token=TOKEN[&agentId=ID]
+// Direct spectator entry via ?spectateMatch=ID&token=TOKEN[&agentId=ID]
 const params = new URLSearchParams(window.location.search);
 const directMatchId = params.get("spectateMatch");
 const directToken = params.get("token");
@@ -38,7 +50,15 @@ const directAgentId = params.get("agentId") ?? undefined;
 const simMode = params.get("sim");
 
 if (simMode !== null) {
-  renderSim(root, () => showLobby());
+  // Sim requires an authenticated (non-guest) session
+  const s = loadSession();
+  if (!s || s.isGuest) {
+    showAuth();
+  } else {
+    import("./ui/sim.js")
+      .then(({ renderSim }) => renderSim(root, () => showLobby()))
+      .catch(console.error);
+  }
 } else if (directMatchId && directToken) {
   renderMatch(
     root,

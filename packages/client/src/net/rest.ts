@@ -22,6 +22,11 @@ export interface MatchAndCredential {
   credential: PlayerCredential;
 }
 
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("browserciv_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function listMatches(): Promise<MatchSummary[]> {
   const r = await fetch(`${SERVER}/matches`);
   if (!r.ok) throw new Error(`listMatches failed: ${r.status}`);
@@ -32,7 +37,7 @@ export async function listMatches(): Promise<MatchSummary[]> {
 export async function createMatch(req: CreateMatchRequest): Promise<MatchAndCredential> {
   const r = await fetch(`${SERVER}/matches`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...authHeaders() },
     body: JSON.stringify(req),
   });
   if (!r.ok) throw new Error(`createMatch failed: ${r.status} ${await r.text()}`);
@@ -42,10 +47,24 @@ export async function createMatch(req: CreateMatchRequest): Promise<MatchAndCred
 export async function joinMatch(matchId: string, req: JoinMatchRequest): Promise<MatchAndCredential> {
   const r = await fetch(`${SERVER}/matches/${encodeURIComponent(matchId)}/join`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...authHeaders() },
     body: JSON.stringify(req),
   });
   if (!r.ok) throw new Error(`joinMatch failed: ${r.status} ${await r.text()}`);
+  return (await r.json()) as MatchAndCredential;
+}
+
+export async function createSoloMatch(req: {
+  playerName?: string;
+  mapSize?: "small" | "medium" | "large";
+  strategy?: string;
+}): Promise<MatchAndCredential> {
+  const r = await fetch(`${SERVER}/matches/solo`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  if (!r.ok) throw new Error(`createSoloMatch failed: ${r.status} ${await r.text()}`);
   return (await r.json()) as MatchAndCredential;
 }
 

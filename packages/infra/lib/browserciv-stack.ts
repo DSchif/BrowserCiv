@@ -5,6 +5,7 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as ecsPatterns from "aws-cdk-lib/aws-ecs-patterns";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 
 /**
@@ -36,6 +37,16 @@ export class BrowserCivStack extends cdk.Stack {
           cidrMask: 24,
         },
       ],
+    });
+
+    // --- Secrets ---
+    const jwtSecret = new secretsmanager.Secret(this, "JwtSecret", {
+      secretName: "browserciv/jwt-secret",
+      generateSecretString: {
+        passwordLength: 64,
+        excludePunctuation: true,
+      },
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     // --- Persistence ---
@@ -75,6 +86,9 @@ export class BrowserCivStack extends cdk.Stack {
             AWS_REGION: this.region,
             SIM_SERVER_URL: "http://localhost:3334",
           },
+          secrets: {
+            JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret),
+          },
         },
       },
     );
@@ -109,8 +123,9 @@ export class BrowserCivStack extends cdk.Stack {
       "300",
     );
 
-    // Server's task role can read/write the state table.
+    // Server's task role can read/write the state table and read the JWT secret.
     stateTable.grantReadWriteData(service.taskDefinition.taskRole);
+    jwtSecret.grantRead(service.taskDefinition.taskRole);
 
     this.serviceUrl = `http://${service.loadBalancer.loadBalancerDnsName}`;
     new cdk.CfnOutput(this, "ServiceUrl", { value: this.serviceUrl });
