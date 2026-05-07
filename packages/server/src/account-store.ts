@@ -9,7 +9,6 @@ import {
 
 export interface UserRecord {
   userId: string;
-  email: string;
   username: string;
   passwordHash: string;
   createdAt: string;
@@ -29,14 +28,14 @@ async function ddbPut(user: UserRecord): Promise<void> {
   if (!c) return;
   await c.doc.send(new PutCommand({
     TableName: c.table,
-    Item: { pk: `user#${user.email}`, ...user },
+    Item: { pk: `user#${user.username.toLowerCase()}`, ...user },
   }));
 }
 
-async function ddbGet(email: string): Promise<UserRecord | null> {
+async function ddbGet(username: string): Promise<UserRecord | null> {
   const c = getClient();
   if (!c) return null;
-  const res = await c.doc.send(new GetCommand({ TableName: c.table, Key: { pk: `user#${email}` } }));
+  const res = await c.doc.send(new GetCommand({ TableName: c.table, Key: { pk: `user#${username.toLowerCase()}` } }));
   if (!res.Item) return null;
   const { pk: _pk, ...rest } = res.Item as { pk: string } & UserRecord;
   return rest;
@@ -47,11 +46,11 @@ async function ddbGet(email: string): Promise<UserRecord | null> {
 const DATA_DIR = process.env.BROWSERCIV_DATA_DIR ?? path.resolve("data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 
-async function fileGet(email: string): Promise<UserRecord | null> {
+async function fileGet(username: string): Promise<UserRecord | null> {
   try {
     const text = await fs.readFile(USERS_FILE, "utf8");
     const map = JSON.parse(text) as Record<string, UserRecord>;
-    return map[email] ?? null;
+    return map[username.toLowerCase()] ?? null;
   } catch {
     return null;
   }
@@ -64,7 +63,7 @@ async function filePut(user: UserRecord): Promise<void> {
     const text = await fs.readFile(USERS_FILE, "utf8");
     map = JSON.parse(text) as Record<string, UserRecord>;
   } catch { /* new file */ }
-  map[user.email] = user;
+  map[user.username.toLowerCase()] = user;
   const tmp = `${USERS_FILE}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(map, null, 2));
   await fs.rename(tmp, USERS_FILE);
@@ -80,9 +79,9 @@ export async function saveUser(user: UserRecord): Promise<void> {
   }
 }
 
-export async function getUser(email: string): Promise<UserRecord | null> {
+export async function getUser(username: string): Promise<UserRecord | null> {
   if (process.env.STATE_TABLE) {
-    return ddbGet(email);
+    return ddbGet(username);
   }
-  return fileGet(email);
+  return fileGet(username);
 }

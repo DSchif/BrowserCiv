@@ -49,16 +49,15 @@ export function renderAuth(
       </div>
 
       <div id="tab-login" class="auth-form">
-        <label>Email<input id="login-email" type="email" placeholder="you@example.com" /></label>
-        <label>Password<input id="login-password" type="password" placeholder="••••••" /></label>
+        <label>Username<input id="login-username" type="text" placeholder="CivilizationBuilder" autocomplete="username" /></label>
+        <label>Password<input id="login-password" type="password" placeholder="••••••" autocomplete="current-password" /></label>
         <div class="error" id="login-err"></div>
         <button id="login-submit" class="btn-primary">Sign In</button>
       </div>
 
       <div id="tab-register" class="auth-form" style="display:none">
-        <label>Username<input id="reg-username" maxlength="40" placeholder="CivilizationBuilder" /></label>
-        <label>Email<input id="reg-email" type="email" placeholder="you@example.com" /></label>
-        <label>Password<input id="reg-password" type="password" placeholder="6+ characters" /></label>
+        <label>Username<input id="reg-username" maxlength="40" placeholder="CivilizationBuilder" autocomplete="username" /></label>
+        <label>Password<input id="reg-password" type="password" placeholder="6+ characters" autocomplete="new-password" /></label>
         <div class="error" id="reg-err"></div>
         <button id="reg-submit" class="btn-primary">Create Account</button>
       </div>
@@ -88,7 +87,7 @@ export function renderAuth(
 
   // Sign In
   root.querySelector<HTMLButtonElement>("#login-submit")!.addEventListener("click", async () => {
-    const email = root.querySelector<HTMLInputElement>("#login-email")!.value.trim();
+    const username = root.querySelector<HTMLInputElement>("#login-username")!.value.trim();
     const password = root.querySelector<HTMLInputElement>("#login-password")!.value;
     const err = root.querySelector<HTMLDivElement>("#login-err")!;
     err.textContent = "";
@@ -96,12 +95,12 @@ export function renderAuth(
       const res = await fetch("/account/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
       const data = (await res.json()) as { token?: string; username?: string; error?: string };
       if (!res.ok) {
         err.textContent = data.error === "INVALID_CREDENTIALS"
-          ? "Incorrect email or password."
+          ? "Incorrect username or password."
           : (data.error ?? "Login failed.");
         return;
       }
@@ -115,7 +114,6 @@ export function renderAuth(
   // Register
   root.querySelector<HTMLButtonElement>("#reg-submit")!.addEventListener("click", async () => {
     const username = root.querySelector<HTMLInputElement>("#reg-username")!.value.trim();
-    const email = root.querySelector<HTMLInputElement>("#reg-email")!.value.trim();
     const password = root.querySelector<HTMLInputElement>("#reg-password")!.value;
     const err = root.querySelector<HTMLDivElement>("#reg-err")!;
     err.textContent = "";
@@ -123,13 +121,12 @@ export function renderAuth(
       const res = await fetch("/account/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password }),
+        body: JSON.stringify({ username, password }),
       });
       const data = (await res.json()) as { token?: string; username?: string; error?: string };
       if (!res.ok) {
         err.textContent =
-          data.error === "EMAIL_TAKEN" ? "Email already in use." :
-          data.error === "INVALID_EMAIL" ? "Enter a valid email address." :
+          data.error === "USERNAME_TAKEN" ? "Username already taken." :
           data.error === "PASSWORD_TOO_SHORT" ? "Password must be at least 6 characters." :
           data.error === "INVALID_USERNAME" ? "Username must be at least 2 characters." :
           (data.error ?? "Registration failed.");
