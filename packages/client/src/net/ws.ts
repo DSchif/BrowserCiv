@@ -26,12 +26,13 @@ export class GameClient {
     private playerId: string,
     private token: string,
     events: ClientNetEvents,
+    private viewAs?: string,
   ) {
     this.events = events;
   }
 
   connect(): void {
-    const ws = new WebSocket(wsUrl(this.token));
+    const ws = new WebSocket(wsUrl(this.token, this.viewAs));
     this.ws = ws;
     ws.addEventListener("open", () => {
       this.events.onOpen?.();

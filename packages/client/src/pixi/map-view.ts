@@ -123,6 +123,7 @@ export class MapViewer {
   pathLayer = new Container();
   cityLayer = new Container();
   unitLayer = new Container();
+  private pendingPathLayer = new Container();
 
   private callbacks: MapViewCallbacks;
   reachable: Map<string, number> = new Map();
@@ -133,6 +134,20 @@ export class MapViewer {
   /** Centered once on the viewer's starting hex; subsequent renders preserve pan/zoom. */
   private hasCentered = false;
   private mapBounds: { minX: number; maxX: number; minY: number; maxY: number } | null = null;
+
+  // ── Render caches ───────────────────────────────────────────────────────────
+  /** Tile visibility fingerprint — if unchanged, skip hex/resource re-render. */
+  private lastVisKey = "";
+  /** Territory ownership fingerprint — if unchanged, skip territory re-render. */
+  private lastTerritoryKey = "";
+  /** Cached unit containers keyed by unit ID. */
+  private unitNodes = new Map<string, Container>();
+  /** State key per unit — skip rebuild if unit hasn't changed. */
+  private unitNodeKeys = new Map<string, string>();
+  /** Cached city containers keyed by city ID. */
+  private cityNodes = new Map<string, Container>();
+  /** State key per city — skip rebuild if city hasn't changed. */
+  private cityNodeKeys = new Map<string, string>();
 
   constructor(app: Application, callbacks: MapViewCallbacks = {}) {
     this.app = app;
@@ -147,6 +162,7 @@ export class MapViewer {
     this.world.addChild(this.pathLayer);
     this.world.addChild(this.cityLayer);
     this.world.addChild(this.unitLayer);
+    this.world.addChild(this.pendingPathLayer);
     this.installPanZoom();
   }
 
@@ -225,8 +241,13 @@ export class MapViewer {
 
   render(view: MatchView): void {
     if (view.map) {
-      this.renderMap(view.map);
-      this.renderResources(view.map);
+      // Compute visibility key once; pass rebuild flag to both static layers.
+      const visKey = view.map.tiles.map((t) => t.visibility[0]).join("");
+      const visChanged = visKey !== this.lastVisKey || this.hexLayer.children.length === 0;
+      if (visChanged) this.lastVisKey = visKey;
+
+      this.renderMap(view.map, visChanged);
+      this.renderResources(view.map, visChanged);
       this.computeMapBounds(view.map);
       if (!this.hasCentered) {
         const me = view.players.find((p) => p.id === view.viewerId);
@@ -248,6 +269,7 @@ export class MapViewer {
   }
 
   private renderPendingPaths(view: MatchView): void {
+    this.pendingPathLayer.removeChildren();
     // Faded trails for any of viewer's units that have queued waypoints.
     for (const u of view.units) {
       if (u.ownerId !== view.viewerId) continue;
@@ -263,7 +285,7 @@ export class MapViewer {
       }
       line.stroke({ color: 0xfff200, width: 2, alpha: 0.35 });
       line.eventMode = "none";
-      this.unitLayer.addChild(line);
+      this.pendingPathLayer.addChild(line);
       for (const c of u.pendingPath) {
         const p = Hex.axialToPixel(c, HEX_SIZE);
         const dot = new Graphics()
@@ -272,12 +294,13 @@ export class MapViewer {
         dot.x = p.x;
         dot.y = p.y;
         dot.eventMode = "none";
-        this.unitLayer.addChild(dot);
+        this.pendingPathLayer.addChild(dot);
       }
     }
   }
 
-  private renderResources(map: MapView): void {
+  private renderResources(map: MapView, forceRebuild: boolean): void {
+    if (!forceRebuild) return;
     this.resourceLayer.removeChildren();
     for (const tile of map.tiles) {
       if (tile.visibility === "unseen") continue;
@@ -347,6 +370,7 @@ export class MapViewer {
   }
 
   private computeMapBounds(map: MapView): void {
+    if (this.mapBounds) return; // tile positions never change — compute once
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const t of map.tiles) {
       const { x, y } = Hex.axialToPixel({ q: t.q, r: t.r }, HEX_SIZE);
@@ -418,7 +442,22 @@ export class MapViewer {
     this.pack = pack;
   }
 
-  private renderMap(map: MapView): void {
+  /** Force all cached layers to rebuild on the next render (e.g. when switching viewAs). */
+  clearLayerCaches(): void {
+    this.lastVisKey = "";
+    this.lastTerritoryKey = "";
+    this.mapBounds = null;
+    // Clear unit/city node caches
+    for (const node of this.unitNodes.values()) this.unitLayer.removeChild(node);
+    this.unitNodes.clear();
+    this.unitNodeKeys.clear();
+    for (const node of this.cityNodes.values()) this.cityLayer.removeChild(node);
+    this.cityNodes.clear();
+    this.cityNodeKeys.clear();
+  }
+
+  private renderMap(map: MapView, forceRebuild: boolean): void {
+    if (!forceRebuild) return;
     this.hexLayer.removeChildren();
     for (const tile of map.tiles) {
       const { x, y } = Hex.axialToPixel({ q: tile.q, r: tile.r }, HEX_SIZE);
@@ -445,8 +484,8 @@ export class MapViewer {
         let alpha = 0.92;
         let fill = baseColor;
         if (tile.visibility === "unseen") {
-          fill = 0x0a0d12;
-          alpha = 0.95;
+          fill = 0x1e2840;  // dark slate — clearly distinct from canvas background
+          alpha = 0.9;
         } else if (tile.visibility === "seen") {
           fill = darken(baseColor, 0.45);
           alpha = 0.65;
@@ -465,9 +504,14 @@ export class MapViewer {
   }
 
   private renderTerritory(view: MatchView): void {
+    if (!view.map) return;
+    // Re-render only when city ownership/tile assignment changes.
+    const tKey = view.cities.map((c) => `${c.id}:${c.ownerId}:${c.ownedTiles.length}`).join("|");
+    if (tKey === this.lastTerritoryKey && this.territoryLayer.children.length > 0) return;
+    this.lastTerritoryKey = tKey;
+
     this.territoryLayer.removeChildren();
     this.borderLayer.removeChildren();
-    if (!view.map) return;
 
     const playerById = new Map<string, Player>(view.players.map((p) => [p.id, p]));
 
@@ -603,123 +647,129 @@ export class MapViewer {
   }
 
   private renderCities(view: MatchView): void {
-    this.cityLayer.removeChildren();
     const playerById = new Map(view.players.map((p) => [p.id, p]));
+    const activeCityIds = new Set(view.cities.map((c) => c.id));
+
+    // Remove cities that no longer exist.
+    for (const [id, node] of this.cityNodes) {
+      if (!activeCityIds.has(id)) {
+        this.cityLayer.removeChild(node);
+        this.cityNodes.delete(id);
+        this.cityNodeKeys.delete(id);
+      }
+    }
+
     for (const c of view.cities) {
       const owner = playerById.get(c.ownerId);
       if (!owner) continue;
-      const { x, y } = Hex.axialToPixel(c.position, HEX_SIZE);
-      const primary = parseColor(owner.primary_color);
-      const secondary = parseColor(owner.secondary_color);
       const isSelected = c.id === this.selectedCityId;
+      const prodKey = c.productionItem ? `${c.productionItem.defId}:${c.production}` : "";
+      const stateKey = `${c.ownerId}|${c.name}|${c.population}|${isSelected}|${prodKey}`;
+      if (this.cityNodes.has(c.id) && this.cityNodeKeys.get(c.id) === stateKey) continue;
 
-      // Castle silhouette drawn directly on the city hex.
-      const cs = HEX_SIZE * 0.45;
-      const castle = new Graphics();
-      // base wall
-      castle.rect(-cs, -cs * 0.05, cs * 2, cs * 0.6);
-      // left tower
-      castle.rect(-cs - 2, -cs * 0.5, cs * 0.55, cs * 1.05);
-      // right tower
-      castle.rect(cs - cs * 0.55 + 2, -cs * 0.5, cs * 0.55, cs * 1.05);
-      // central keep
-      castle.rect(-cs * 0.4, -cs * 0.7, cs * 0.8, cs * 1.25);
-      // crenellations on top of central keep
-      castle.rect(-cs * 0.4, -cs * 0.85, cs * 0.25, cs * 0.18);
-      castle.rect(cs * 0.15, -cs * 0.85, cs * 0.25, cs * 0.18);
-      castle.fill({ color: primary, alpha: 0.98 }).stroke({
-        color: isSelected ? 0xfff200 : secondary,
-        width: isSelected ? 3 : 2,
+      const old = this.cityNodes.get(c.id);
+      if (old) this.cityLayer.removeChild(old);
+
+      const node = this.buildCityNode(c, view, owner, isSelected);
+      this.cityNodes.set(c.id, node);
+      this.cityNodeKeys.set(c.id, stateKey);
+      this.cityLayer.addChild(node);
+    }
+  }
+
+  private buildCityNode(
+    c: import("@browserciv/shared").City,
+    view: MatchView,
+    owner: Player,
+    isSelected: boolean,
+  ): Container {
+    const { x, y } = Hex.axialToPixel(c.position, HEX_SIZE);
+    const primary = parseColor(owner.primary_color);
+    const secondary = parseColor(owner.secondary_color);
+
+    const node = new Container();
+    node.x = x;
+    node.y = y;
+
+    // Castle silhouette
+    const cs = HEX_SIZE * 0.45;
+    const castle = new Graphics();
+    castle.rect(-cs, -cs * 0.05, cs * 2, cs * 0.6);
+    castle.rect(-cs - 2, -cs * 0.5, cs * 0.55, cs * 1.05);
+    castle.rect(cs - cs * 0.55 + 2, -cs * 0.5, cs * 0.55, cs * 1.05);
+    castle.rect(-cs * 0.4, -cs * 0.7, cs * 0.8, cs * 1.25);
+    castle.rect(-cs * 0.4, -cs * 0.85, cs * 0.25, cs * 0.18);
+    castle.rect(cs * 0.15, -cs * 0.85, cs * 0.25, cs * 0.18);
+    castle.fill({ color: primary, alpha: 0.98 }).stroke({ color: isSelected ? 0xfff200 : secondary, width: isSelected ? 3 : 2 });
+    castle.eventMode = "static";
+    castle.cursor = "pointer";
+    castle.on("pointertap", () => this.callbacks.onCityClick?.(c));
+    node.addChild(castle);
+
+    if (isSelected) {
+      const ring = new Graphics();
+      const points: number[] = [];
+      for (const [vx, vy] of VERTS) points.push((HEX_SIZE - 4) * vx, (HEX_SIZE - 4) * vy);
+      ring.poly(points).stroke({ color: 0xfff200, width: 3, alpha: 0.95 });
+      ring.eventMode = "none";
+      node.addChild(ring);
+    }
+
+    // Name plate
+    const plateW = HEX_SIZE * 2.0;
+    const isOwn = c.ownerId === view.viewerId;
+    const showBuilding = isOwn && !!c.productionItem;
+    const plateH = showBuilding ? 30 : 18;
+    const plate = new Graphics()
+      .roundRect(-plateW / 2, -plateH / 2, plateW, plateH, 4)
+      .fill({ color: primary, alpha: 0.95 })
+      .stroke({ color: secondary, width: 2 });
+    plate.y = -HEX_SIZE * 1.05;
+    plate.eventMode = "static";
+    plate.cursor = "pointer";
+    plate.on("pointertap", () => this.callbacks.onCityClick?.(c));
+    node.addChild(plate);
+
+    const nameLabel = new Text({
+      text: `${c.name} · ${c.population}`,
+      style: { fontSize: 11, fill: secondary, fontFamily: "system-ui", fontWeight: "bold" },
+    });
+    nameLabel.anchor.set(0.5);
+    nameLabel.y = -HEX_SIZE * 1.05 + (showBuilding ? -7 : 0);
+    nameLabel.eventMode = "none";
+    node.addChild(nameLabel);
+
+    if (showBuilding && c.productionItem) {
+      const item = c.productionItem;
+      const itemName = this.lookupItemName(item);
+      const cost = this.lookupItemCost(item);
+      const ppt = c.perTurnYields.production ?? 0;
+      const remaining = cost !== null ? Math.max(0, cost - c.production) : 0;
+      const turnsLeft = ppt > 0 && cost !== null ? Math.ceil(remaining / ppt) : null;
+      const turnsLabel = turnsLeft !== null ? ` ${turnsLeft}t` : "";
+      const buildLabel = new Text({
+        text: `→ ${itemName}${turnsLabel}`,
+        style: { fontSize: 10, fill: secondary, fontFamily: "system-ui" },
       });
-      castle.x = x;
-      castle.y = y;
-      castle.eventMode = "static";
-      castle.cursor = "pointer";
-      castle.on("pointertap", () => this.callbacks.onCityClick?.(c));
-      this.cityLayer.addChild(castle);
+      buildLabel.anchor.set(0.5);
+      buildLabel.y = -HEX_SIZE * 1.05 + 6;
+      buildLabel.eventMode = "none";
+      node.addChild(buildLabel);
 
-      // Selection ring around the entire hex
-      if (isSelected) {
-        const ring = new Graphics();
-        const points: number[] = [];
-        for (const [vx, vy] of VERTS)
-          points.push((HEX_SIZE - 4) * vx, (HEX_SIZE - 4) * vy);
-        ring.poly(points).stroke({ color: 0xfff200, width: 3, alpha: 0.95 });
-        ring.x = x;
-        ring.y = y;
-        ring.eventMode = "none";
-        this.cityLayer.addChild(ring);
-      }
-
-      // Name plate above the hex (kept for readability of name + pop + production).
-      const plateW = HEX_SIZE * 2.0;
-      const isOwn = c.ownerId === view.viewerId;
-      const showBuilding = isOwn && !!c.productionItem;
-      const plateH = showBuilding ? 30 : 18;
-      const plate = new Graphics()
-        .roundRect(-plateW / 2, -plateH / 2, plateW, plateH, 4)
-        .fill({ color: primary, alpha: 0.95 })
-        .stroke({ color: secondary, width: 2 });
-      plate.x = x;
-      plate.y = y - HEX_SIZE * 1.05;
-      plate.eventMode = "static";
-      plate.cursor = "pointer";
-      plate.on("pointertap", () => this.callbacks.onCityClick?.(c));
-      this.cityLayer.addChild(plate);
-
-      const nameLabel = new Text({
-        text: `${c.name} · ${c.population}`,
-        style: {
-          fontSize: 11,
-          fill: secondary,
-          fontFamily: "system-ui",
-          fontWeight: "bold",
-        },
-      });
-      nameLabel.anchor.set(0.5);
-      nameLabel.x = x;
-      nameLabel.y = y - HEX_SIZE * 1.05 + (showBuilding ? -7 : 0);
-      nameLabel.eventMode = "none";
-      this.cityLayer.addChild(nameLabel);
-
-      // What is this city building?
-      if (showBuilding && c.productionItem) {
-        const item = c.productionItem;
-        const itemName = this.lookupItemName(item);
-        const cost = this.lookupItemCost(item);
-        const ppt = c.perTurnYields.production ?? 0;
-        const remaining = cost !== null ? Math.max(0, cost - c.production) : 0;
-        const turnsLeft = ppt > 0 && cost !== null ? Math.ceil(remaining / ppt) : null;
-        const turnsLabel = turnsLeft !== null ? ` ${turnsLeft}t` : "";
-        const buildLabel = new Text({
-          text: `→ ${itemName}${turnsLabel}`,
-          style: {
-            fontSize: 10,
-            fill: secondary,
-            fontFamily: "system-ui",
-          },
-        });
-        buildLabel.anchor.set(0.5);
-        buildLabel.x = x;
-        buildLabel.y = y - HEX_SIZE * 1.05 + 6;
-        buildLabel.eventMode = "none";
-        this.cityLayer.addChild(buildLabel);
-
-        // Accurate progress bar based on real cost.
-        if (cost !== null && cost > 0) {
-          const bar = new Graphics();
-          const barW = plateW - 8;
-          const barH = 3;
-          bar.rect(-barW / 2, 0, barW, barH).fill({ color: 0x000000, alpha: 0.6 });
-          const pct = Math.min(1, c.production / cost);
-          bar.rect(-barW / 2, 0, barW * pct, barH).fill({ color: 0xffd700, alpha: 0.95 });
-          bar.x = x;
-          bar.y = y - HEX_SIZE * 1.05 + plateH / 2 - 5;
-          bar.eventMode = "none";
-          this.cityLayer.addChild(bar);
-        }
+      if (cost !== null && cost > 0) {
+        const bar = new Graphics();
+        const barW = plateW - 8;
+        const barH = 3;
+        bar.rect(-barW / 2, 0, barW, barH).fill({ color: 0x000000, alpha: 0.6 });
+        const pct = Math.min(1, c.production / cost);
+        bar.rect(-barW / 2, 0, barW * pct, barH).fill({ color: 0xffd700, alpha: 0.95 });
+        bar.y = -HEX_SIZE * 1.05 + plateH / 2 - 5;
+        bar.eventMode = "none";
+        node.addChild(bar);
       }
     }
+
+    return node;
   }
 
   private lookupItemName(item: { kind: "unit" | "building" | "wonder"; defId: string }): string {
@@ -741,79 +791,99 @@ export class MapViewer {
   }
 
   private renderUnits(units: Unit[], viewerId: string, players: Player[]): void {
-    this.unitLayer.removeChildren();
     const playerById = new Map(players.map((p) => [p.id, p]));
+    const activeIds = new Set(units.map((u) => u.id));
+
+    // Remove units that no longer exist.
+    for (const [id, node] of this.unitNodes) {
+      if (!activeIds.has(id)) {
+        this.unitLayer.removeChild(node);
+        this.unitNodes.delete(id);
+        this.unitNodeKeys.delete(id);
+      }
+    }
+
     for (const u of units) {
       const owner = playerById.get(u.ownerId);
       if (!owner) continue;
       const { x, y } = Hex.axialToPixel(u.position, HEX_SIZE);
-      const glyph = UNIT_GLYPH[u.defId] ?? "?";
       const isMine = u.ownerId === viewerId;
       const isSelected = u.id === this.selectedUnitId;
-      const primary = parseColor(owner.primary_color);
-      const secondary = parseColor(owner.secondary_color);
 
-      const bg = new Graphics()
-        .circle(0, 0, HEX_SIZE * 0.55)
-        .fill({ color: primary, alpha: 0.95 })
-        .stroke({
-          color: isSelected ? 0xfff200 : secondary,
-          width: isSelected ? 4 : 2,
-          alpha: 1,
-        });
-      bg.x = x;
-      bg.y = y;
-      bg.eventMode = "static";
-      bg.cursor = "pointer";
-      bg.on("pointertap", () => this.callbacks.onUnitClick?.(u));
-      bg.on("pointerover", () => this.callbacks.onTileHover?.(u.position));
-      bg.on("pointerout", () => this.callbacks.onTileHover?.(null));
-      this.unitLayer.addChild(bg);
+      // Build a cheap state key — only rebuild the container when something visible changed.
+      const stateKey = `${x},${y}|${u.hp}/${u.hpMax}|${u.movementLeft}|${isSelected}|${owner.primary_color}`;
 
-      const label = new Text({
-        text: glyph,
-        style: {
-          fontSize: 20,
-          fill: secondary,
-          fontFamily: "system-ui",
-          fontWeight: "bold",
-        },
-      });
-      label.anchor.set(0.5);
-      label.x = x;
-      label.y = y;
-      this.unitLayer.addChild(label);
-
-      if (isMine) {
-        const mp = new Text({
-          text: `${u.movementLeft}/${u.movementMax}`,
-          style: {
-            fontSize: 9,
-            fill: 0xffffff,
-            stroke: { color: 0x000000, width: 2 },
-            fontFamily: "monospace",
-          },
-        });
-        mp.anchor.set(0.5);
-        mp.x = x;
-        mp.y = y + HEX_SIZE * 0.65;
-        this.unitLayer.addChild(mp);
+      if (this.unitNodes.has(u.id) && this.unitNodeKeys.get(u.id) === stateKey) {
+        continue; // nothing changed, keep existing container
       }
 
-      // Health bar — shown whenever unit has taken damage
-      if (u.hp < u.hpMax) {
-        const barW = HEX_SIZE * 1.1;
-        const pct = Math.max(0, u.hp / u.hpMax);
-        const barColor = pct > 0.6 ? 0x2ea043 : pct > 0.3 ? 0xd29922 : 0xf85149;
-        const bar = new Graphics();
-        bar.rect(-barW / 2, 0, barW, 4).fill({ color: 0x1a0000, alpha: 0.9 });
-        bar.rect(-barW / 2, 0, barW * pct, 4).fill({ color: barColor, alpha: 1 });
-        bar.x = x;
-        bar.y = y - HEX_SIZE * 0.72;
-        bar.eventMode = "none";
-        this.unitLayer.addChild(bar);
-      }
+      // Remove old container (if any) before replacing.
+      const old = this.unitNodes.get(u.id);
+      if (old) this.unitLayer.removeChild(old);
+
+      const node = this.buildUnitNode(u, x, y, isMine, isSelected, owner);
+      this.unitNodes.set(u.id, node);
+      this.unitNodeKeys.set(u.id, stateKey);
+      this.unitLayer.addChild(node);
     }
+  }
+
+  private buildUnitNode(
+    u: Unit, x: number, y: number,
+    isMine: boolean, isSelected: boolean,
+    owner: Player,
+  ): Container {
+    const glyph = UNIT_GLYPH[u.defId] ?? "?";
+    const primary = parseColor(owner.primary_color);
+    const secondary = parseColor(owner.secondary_color);
+
+    const node = new Container();
+    node.x = x;
+    node.y = y;
+
+    const bg = new Graphics()
+      .circle(0, 0, HEX_SIZE * 0.55)
+      .fill({ color: primary, alpha: 0.95 })
+      .stroke({ color: isSelected ? 0xfff200 : secondary, width: isSelected ? 4 : 2 });
+    bg.eventMode = "static";
+    bg.cursor = "pointer";
+    bg.on("pointertap", () => this.callbacks.onUnitClick?.(u));
+    bg.on("pointerover", () => this.callbacks.onTileHover?.(u.position));
+    bg.on("pointerout", () => this.callbacks.onTileHover?.(null));
+    node.addChild(bg);
+
+    const label = new Text({
+      text: glyph,
+      style: { fontSize: 20, fill: secondary, fontFamily: "system-ui", fontWeight: "bold" },
+    });
+    label.anchor.set(0.5);
+    label.eventMode = "none";
+    node.addChild(label);
+
+    if (isMine) {
+      const mp = new Text({
+        text: `${u.movementLeft}/${u.movementMax}`,
+        style: { fontSize: 9, fill: 0xffffff, stroke: { color: 0x000000, width: 2 }, fontFamily: "monospace" },
+      });
+      mp.anchor.set(0.5);
+      mp.y = HEX_SIZE * 0.65;
+      mp.eventMode = "none";
+      node.addChild(mp);
+    }
+
+    if (u.hp < u.hpMax) {
+      const barW = HEX_SIZE * 1.1;
+      const pct = Math.max(0, u.hp / u.hpMax);
+      const barColor = pct > 0.6 ? 0x2ea043 : pct > 0.3 ? 0xd29922 : 0xf85149;
+      const bar = new Graphics();
+      bar.rect(-barW / 2, 0, barW, 4).fill({ color: 0x1a0000, alpha: 0.9 });
+      bar.rect(-barW / 2, 0, barW * pct, 4).fill({ color: barColor, alpha: 1 });
+      bar.y = -HEX_SIZE * 0.72;
+      bar.eventMode = "none";
+      node.addChild(bar);
+    }
+
+    return node;
   }
 
   private renderOverlay(): void {

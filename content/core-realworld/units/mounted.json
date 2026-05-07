@@ -15,6 +15,7 @@
     "cost": {
       "production": 56
     },
+    "maintenance_gold": 1,
     "prereq_tech": "tech.the_wheel",
     "era_required": "ancient",
     "evolves_to": "unit.horseman",
@@ -54,6 +55,7 @@
     "cost": {
       "production": 75
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.horseback_riding",
     "era_required": "classical",
     "evolves_to": "unit.knight",
@@ -92,6 +94,7 @@
     "cost": {
       "production": 120
     },
+    "maintenance_gold": 3,
     "prereq_tech": "tech.chivalry",
     "era_required": "medieval",
     "evolves_to": "unit.cavalry",
@@ -130,6 +133,7 @@
     "cost": {
       "production": 240
     },
+    "maintenance_gold": 3,
     "prereq_tech": "tech.military_science",
     "era_required": "industrial",
     "evolves_to": "unit.modern_armor",
@@ -168,6 +172,7 @@
     "cost": {
       "production": 425
     },
+    "maintenance_gold": 4,
     "prereq_tech": "tech.lasers",
     "era_required": "atomic",
     "traits": [

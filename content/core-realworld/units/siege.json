@@ -18,6 +18,7 @@
         "resource.iron": 1
       }
     },
+    "maintenance_gold": 1,
     "prereq_tech": "tech.mathematics",
     "era_required": "classical",
     "evolves_to": "unit.trebuchet",
@@ -59,6 +60,7 @@
     "cost": {
       "production": 120
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.physics",
     "era_required": "medieval",
     "evolves_to": "unit.cannon",
@@ -100,6 +102,7 @@
     "cost": {
       "production": 200
     },
+    "maintenance_gold": 3,
     "prereq_tech": "tech.chemistry",
     "era_required": "renaissance",
     "evolves_to": "unit.artillery",
@@ -141,6 +144,7 @@
     "cost": {
       "production": 350
     },
+    "maintenance_gold": 3,
     "prereq_tech": "tech.dynamite",
     "era_required": "industrial",
     "traits": [

@@ -55,8 +55,10 @@ export async function fetchContentPack(): Promise<ContentPack> {
   return (await r.json()) as ContentPack;
 }
 
-export function wsUrl(token: string): string {
+export function wsUrl(token: string, viewAs?: string): string {
   const httpUrl = new URL(SERVER);
   const wsProto = httpUrl.protocol === "https:" ? "wss:" : "ws:";
-  return `${wsProto}//${httpUrl.host}/ws?token=${encodeURIComponent(token)}`;
+  let url = `${wsProto}//${httpUrl.host}/ws?token=${encodeURIComponent(token)}`;
+  if (viewAs) url += `&viewAs=${encodeURIComponent(viewAs)}`;
+  return url;
 }

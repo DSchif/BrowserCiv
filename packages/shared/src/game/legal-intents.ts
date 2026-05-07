@@ -53,12 +53,13 @@ export function getLegalIntents(
       }
     }
 
-    // MoveUnit — each passable, unoccupied neighbour
+    // MoveUnit — each passable, unoccupied, non-city neighbour
     for (const nb of neighbors(unit.position)) {
       const k = `${nb.q},${nb.r}`;
       const tile = tiles.get(k);
       if (!tile) continue;
       if (occupiedKeys.has(k)) continue;
+      if (cityKeys.has(k)) continue;
       const terrain = content.terrains.find(
         (t) => (t.id as unknown as string) === tile.terrain,
       );
@@ -101,11 +102,17 @@ export function getLegalIntents(
 
   // ── Research ─────────────────────────────────────────────────────────────
   if (me && !me.currentTech) {
+    const playerCiv = content.civilizations.find(
+      (c) => (c.id as unknown as string) === me.civId,
+    );
+    const treeId = (playerCiv as Record<string, unknown>)?.tech_tree_id as string | undefined;
+
     for (const tech of content.techs) {
       const techId = tech.id as unknown as string;
       if (researchedTechs.has(techId)) continue;
-      const prereq = (tech as Record<string, unknown>).prereq_tech as string | undefined;
-      if (prereq && !researchedTechs.has(prereq)) continue;
+      if (treeId && (tech as Record<string, unknown>).tree_id !== treeId) continue;
+      const prereqs = (tech.prereqs as unknown as string[]) ?? [];
+      if (!prereqs.every((p) => researchedTechs.has(p))) continue;
       intents.push({ type: "SetResearch", actorId: playerId, techId });
     }
   }

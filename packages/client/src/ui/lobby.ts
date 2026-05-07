@@ -8,7 +8,7 @@ export interface LobbyResult {
   name: string;
 }
 
-export function renderLobby(root: HTMLElement, onPicked: (r: LobbyResult) => void): void {
+export function renderLobby(root: HTMLElement, onPicked: (r: LobbyResult) => void, onSim?: () => void): void {
   root.innerHTML = `
     <div class="lobby">
       <h1>BrowserCiv — Lobby</h1>
@@ -26,6 +26,7 @@ export function renderLobby(root: HTMLElement, onPicked: (r: LobbyResult) => voi
       <div class="row">
         <button id="create">Create match</button>
         <button id="refresh">Refresh list</button>
+        ${onSim ? `<button id="sim-btn" style="margin-left:auto">🤖 Simulation</button>` : ""}
       </div>
       <h2>Open matches</h2>
       <ul id="matches"><li class="dim">Loading…</li></ul>
@@ -106,6 +107,9 @@ export function renderLobby(root: HTMLElement, onPicked: (r: LobbyResult) => voi
     }
   });
 
+  if (onSim) {
+    root.querySelector<HTMLButtonElement>("#sim-btn")?.addEventListener("click", onSim);
+  }
   refreshBtn.addEventListener("click", () => void refresh());
   void refresh();
 }

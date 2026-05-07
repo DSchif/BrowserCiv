@@ -15,6 +15,7 @@ export async function registerWsRoutes(app: FastifyInstance): Promise<void> {
   }, req) => {
     const url = new URL(req.url, "http://localhost");
     const token = url.searchParams.get("token");
+    const viewAs = url.searchParams.get("viewAs") ?? undefined;
     const cred = token ? lookupToken(token) : null;
     if (!cred) {
       sendError(socket, "AUTH_FAILED", "missing or invalid token");
@@ -29,12 +30,15 @@ export async function registerWsRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    // Spectators get full-visibility snapshots and cannot send intents.
+    // Spectators cannot send intents; optionally receive a fogged view via viewAs.
     if (cred.spectator) {
-      const detach = rt.attachSpectator(socket);
+      const detach = rt.attachSpectator(socket, viewAs);
       socket.on("message", (raw: unknown) => {
         const parsed = JSON.parse(String(raw)) as { type?: string };
-        if (parsed?.type === "Hello") rt.sendSpectatorSnapshot(socket);
+        if (parsed?.type === "Hello") {
+          if (viewAs) rt.sendSnapshot(socket, viewAs);
+          else rt.sendSpectatorSnapshot(socket);
+        }
       });
       socket.on("close", () => detach());
       return;

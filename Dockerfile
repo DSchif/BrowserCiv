@@ -13,6 +13,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/content-validator/package.json packages/content-validator/
 COPY packages/server/package.json packages/server/
 COPY packages/client/package.json packages/client/
+COPY packages/bot/package.json packages/bot/
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy sources and the content pack.
@@ -20,6 +21,7 @@ COPY packages/shared packages/shared
 COPY packages/content-validator packages/content-validator
 COPY packages/server packages/server
 COPY packages/client packages/client
+COPY packages/bot packages/bot
 COPY content content
 
 # Build the client SPA (production bundle) — server will serve dist/ statically.

@@ -13,6 +13,7 @@
     "cost": {
       "production": 40
     },
+    "maintenance_gold": 1,
     "era_required": "ancient",
     "evolves_to": "unit.swordsman",
     "upgrade_cost": {
@@ -53,6 +54,7 @@
         "resource.iron": 1
       }
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.iron_working",
     "era_required": "classical",
     "evolves_to": "unit.longswordsman",
@@ -94,6 +96,7 @@
         "resource.iron": 1
       }
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.steel",
     "era_required": "medieval",
     "evolves_to": "unit.musketman",
@@ -132,6 +135,7 @@
     "cost": {
       "production": 120
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.gunpowder",
     "era_required": "renaissance",
     "evolves_to": "unit.rifleman",
@@ -170,6 +174,7 @@
     "cost": {
       "production": 200
     },
+    "maintenance_gold": 3,
     "prereq_tech": "tech.rifling",
     "era_required": "industrial",
     "evolves_to": "unit.great_war_infantry",
@@ -208,6 +213,7 @@
     "cost": {
       "production": 50
     },
+    "maintenance_gold": 1,
     "prereq_tech": "tech.bronze_working",
     "era_required": "ancient",
     "evolves_to": "unit.pikeman",
@@ -246,6 +252,7 @@
     "cost": {
       "production": 75
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.civil_service",
     "era_required": "medieval",
     "evolves_to": "unit.lancer",
@@ -284,6 +291,7 @@
     "cost": {
       "production": 150
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.metallurgy",
     "era_required": "renaissance",
     "traits": [

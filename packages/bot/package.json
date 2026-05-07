@@ -11,6 +11,9 @@
     "start:train": "tsx src/train.ts",
     "plot": "tsx src/plot.ts",
     "session": "tsx src/session.ts",
+    "hier-session": "tsx src/hier-session.ts",
+    "viz": "tsx src/viz.ts",
+    "sim-server": "tsx src/sim-server.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },

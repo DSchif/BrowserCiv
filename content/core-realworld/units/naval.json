@@ -14,6 +14,7 @@
     "cost": {
       "production": 45
     },
+    "maintenance_gold": 1,
     "prereq_tech": "tech.sailing",
     "era_required": "ancient",
     "evolves_to": "unit.galleass",
@@ -56,6 +57,7 @@
     "cost": {
       "production": 100
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.compass",
     "era_required": "medieval",
     "evolves_to": "unit.frigate",
@@ -97,6 +99,7 @@
     "cost": {
       "production": 100
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.astronomy",
     "era_required": "renaissance",
     "traits": [
@@ -135,6 +138,7 @@
     "cost": {
       "production": 175
     },
+    "maintenance_gold": 3,
     "prereq_tech": "tech.navigation",
     "era_required": "renaissance",
     "evolves_to": "unit.ironclad",
@@ -176,6 +180,7 @@
     "cost": {
       "production": 285
     },
+    "maintenance_gold": 4,
     "prereq_tech": "tech.steam_power",
     "era_required": "industrial",
     "evolves_to": "unit.battleship",
@@ -218,6 +223,7 @@
     "cost": {
       "production": 425
     },
+    "maintenance_gold": 5,
     "prereq_tech": "tech.combustion",
     "era_required": "modern",
     "traits": [

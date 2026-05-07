@@ -6,12 +6,17 @@ import { makeTransition } from "./agent/q-agent.js";
 import type { QAgent } from "./agent/q-agent.js";
 import type { RewardFn } from "./agent/reward.js";
 
+import type { TurnSnap } from "./dump.js";
+
 export interface EpisodeResult {
   agentReward: number;
   agentSteps: number;
   turns: number;
   winner: string | null | undefined;
   timedOut?: boolean;
+  kills?: number;
+  citiesCaptured?: number;
+  dump?: TurnSnap[];
 }
 
 function wsUrl(serverUrl: string, token: string): string {
@@ -53,6 +58,9 @@ export async function runTrainingEpisode(opts: {
     let agentSteps = 0;
     let settled = false;
     let lastSnapshotAt = Date.now();
+    // Track actionSeq of the state we last sent an intent for — prevents
+    // duplicate intents when the server re-broadcasts the same state.
+    let lastIntentActionSeq = -1;
 
     // ── Stall watchdog ────────────────────────────────────────────────────────
     // If no snapshot arrives for stallTimeoutMs, the game is stuck — bail out.
@@ -120,12 +128,13 @@ export async function runTrainingEpisode(opts: {
           return;
         }
 
-        if (isMyTurn(state)) {
+        if (isMyTurn(state) && state.actionSeq > lastIntentActionSeq) {
           const legal = getLegalIntents(state, playerId, content);
           if (legal.length === 0) return;
           const intent = agent.selectIntent(legal, state, playerId, true);
           pendingPrev = state;
           pendingIntent = intent;
+          lastIntentActionSeq = state.actionSeq;
           send({ type: "Intent", clientSeq: clientSeq++, intent });
         }
       }
@@ -135,6 +144,8 @@ export async function runTrainingEpisode(opts: {
         log(`intent rejected: ${String(msg.code)}`);
         pendingPrev = null;
         pendingIntent = null;
+        // Reset so the next snapshot can trigger a fresh intent.
+        lastIntentActionSeq = -1;
         if (msg.code === "NOT_YOUR_TURN") {
           // Re-sync: the server might already be on our turn waiting for us,
           // meaning we'd deadlock waiting for a snapshot that never comes.

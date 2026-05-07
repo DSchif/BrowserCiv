@@ -13,6 +13,7 @@
     "cost": {
       "production": 250
     },
+    "maintenance_gold": 4,
     "prereq_tech": "tech.replaceable_parts",
     "era_required": "modern",
     "evolves_to": "unit.infantry",
@@ -51,6 +52,7 @@
     "cost": {
       "production": 320
     },
+    "maintenance_gold": 4,
     "prereq_tech": "tech.plastics",
     "era_required": "modern",
     "evolves_to": "unit.mech_infantry",
@@ -89,6 +91,7 @@
     "cost": {
       "production": 425
     },
+    "maintenance_gold": 5,
     "prereq_tech": "tech.computers",
     "era_required": "atomic",
     "traits": [
@@ -123,6 +126,7 @@
     "cost": {
       "production": 750
     },
+    "maintenance_gold": 8,
     "prereq_tech": "tech.nanotechnology",
     "era_required": "information",
     "traits": [

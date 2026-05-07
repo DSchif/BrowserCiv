@@ -38,6 +38,8 @@ export interface MatchSession {
   token: string;
   name: string;
   spectator?: boolean;
+  /** When watching a training match, the agent's player ID for fog-of-war toggle. */
+  agentId?: string;
 }
 
 export function renderMatch(
@@ -85,6 +87,7 @@ export function renderMatch(
         <code class="match-code">${escape(session.matchId)}</code>
         <button id="start" class="tb-btn tb-start hidden" disabled>Start match</button>
         ${session.spectator ? `<span class="tb-spectator-badge">Watching</span>` : ""}
+        ${session.agentId ? `<button id="fog-toggle" class="tb-btn" title="Toggle fog of war">Fog: off</button>` : ""}
       </div>
       <div class="tb-center">
         <span id="turn-label" class="tb-dim">connecting…</span>
@@ -221,7 +224,9 @@ export function renderMatch(
       if (latest) renderState(latest);
     });
 
-  const client = new GameClient(session.matchId, session.playerId, session.token, {
+  let fogOn = false; // false = full spectator view, true = agent's fogged view
+
+  const makeClientEvents = () => ({
     onOpen: () => {
       statusDot.classList.remove("disconnected");
       statusDot.title = "connected";
@@ -230,20 +235,41 @@ export function renderMatch(
       statusDot.classList.add("disconnected");
       statusDot.title = "disconnected";
     },
-    onError: (code, msg) => {
+    onError: (code: string, msg: string) => {
       statusDot.classList.add("disconnected");
       statusDot.title = `error: ${code} — ${msg}`;
     },
-    onState: (state) => {
+    onState: (state: import("@browserciv/shared").MatchState) => {
       latest = state as unknown as MatchView;
       renderState(latest);
     },
-    onReject: (_seq, code, msg) => {
+    onReject: (_seq: number, code: string, msg: string) => {
       statusDot.title = `rejected: ${code} — ${msg}`;
     },
     onAck: () => undefined,
   });
+
+  let client = new GameClient(
+    session.matchId, session.playerId, session.token,
+    makeClientEvents(),
+  );
   client.connect();
+
+  // Fog-of-war toggle for training spectators.
+  const fogToggleBtn = root.querySelector<HTMLButtonElement>("#fog-toggle");
+  if (fogToggleBtn && session.agentId) {
+    fogToggleBtn.addEventListener("click", () => {
+      fogOn = !fogOn;
+      fogToggleBtn.textContent = fogOn ? "Fog: on" : "Fog: off";
+      client.close();
+      client = new GameClient(
+        session.matchId, session.playerId, session.token,
+        makeClientEvents(),
+        fogOn ? session.agentId : undefined,
+      );
+      client.connect();
+    });
+  }
 
   // In spectator mode, hide all player-action UI permanently.
   if (session.spectator) {

@@ -1,4 +1,5 @@
 import cors from "@fastify/cors";
+import httpProxy from "@fastify/http-proxy";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
 import Fastify from "fastify";
@@ -56,6 +57,14 @@ app.get("/content-pack", async () => content);
 
 await registerMatchRoutes(app);
 await registerWsRoutes(app);
+
+const SIM_SERVER_URL = process.env.SIM_SERVER_URL;
+if (SIM_SERVER_URL) {
+  for (const prefix of ["/sim", "/agents", "/runs"]) {
+    await app.register(httpProxy, { upstream: SIM_SERVER_URL, prefix, rewritePrefix: prefix });
+  }
+  app.log.info(`sim-server proxy → ${SIM_SERVER_URL}`);
+}
 
 // In production we ship the built SPA inside the same image and serve it
 // from CLIENT_DIST. With no env var set, the JSON fallback below answers /

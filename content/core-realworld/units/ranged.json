@@ -15,6 +15,7 @@
     "cost": {
       "production": 40
     },
+    "maintenance_gold": 1,
     "prereq_tech": "tech.archery",
     "era_required": "ancient",
     "evolves_to": "unit.composite_bowman",
@@ -55,6 +56,7 @@
     "cost": {
       "production": 75
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.construction",
     "era_required": "classical",
     "evolves_to": "unit.crossbowman",
@@ -95,6 +97,7 @@
     "cost": {
       "production": 120
     },
+    "maintenance_gold": 2,
     "prereq_tech": "tech.machinery",
     "era_required": "medieval",
     "traits": [

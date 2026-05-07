@@ -5,6 +5,11 @@ const backendProxy = {
   changeOrigin: true,
 };
 
+const simProxy = {
+  target: "http://localhost:3334",
+  changeOrigin: true,
+};
+
 export default defineConfig({
   server: {
     port: 5173,
@@ -14,6 +19,9 @@ export default defineConfig({
       "/content-pack": backendProxy,
       "/health": backendProxy,
       "/ws": { ...backendProxy, ws: true },
+      "/sim": simProxy,
+      "/agents": simProxy,
+      "/runs": simProxy,
     },
   },
   preview: {
@@ -23,6 +31,9 @@ export default defineConfig({
       "/content-pack": backendProxy,
       "/health": backendProxy,
       "/ws": { ...backendProxy, ws: true },
+      "/sim": simProxy,
+      "/agents": simProxy,
+      "/runs": simProxy,
     },
   },
   build: {

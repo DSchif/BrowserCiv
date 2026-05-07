@@ -312,9 +312,10 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
     putMatch(rt);
 
     const agentToken = issueToken(agentId, matchId);
+    const opponentToken = issueToken(opponentId, matchId);
     const spectatorToken = issueSpectatorToken(matchId);
 
-    return reply.send({ matchId, agentToken, spectatorToken, opponentId, strategy });
+    return reply.send({ matchId, agentToken, opponentToken, spectatorToken, opponentId, strategy });
   });
 
   /**
@@ -330,6 +331,8 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       opponentId: string;
       strategy?: string;
       noFog?: boolean;
+      /** When true, skip creating a BotDriver (used for RL-vs-RL where both sides are agents). */
+      skipBot?: boolean;
     };
 
     const rt = getMatch(body.matchId);
@@ -352,7 +355,9 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       noFog: body.noFog ?? true,
     });
 
-    new BotDriver(rt, body.opponentId, strategy);
+    if (!body.skipBot) {
+      new BotDriver(rt, body.opponentId, strategy);
+    }
     rt.broadcastSnapshot();
 
     return reply.send({ ok: true });

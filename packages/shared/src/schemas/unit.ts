@@ -48,6 +48,9 @@ export const UnitDef = z
 
     cost: Cost,
 
+    /** Gold deducted from the owner's treasury each time their turn is processed. */
+    maintenance_gold: z.number().int().nonnegative().default(0),
+
     prereq_tech: TechId.optional(),
     era_required: EraId,
 

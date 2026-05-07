@@ -28,7 +28,7 @@ export function setApplyListener(fn: ((rt: MatchRuntime) => void) | null): void 
 
 export class MatchRuntime {
   private conns = new Set<SocketConn>();
-  private spectators = new Set<WsLike>();
+  private spectators = new Set<{ ws: WsLike; viewAs?: string }>();
   private stateListeners = new Set<(rt: MatchRuntime) => void>();
 
   constructor(
@@ -220,10 +220,12 @@ export class MatchRuntime {
     };
   }
 
-  attachSpectator(ws: WsLike): () => void {
-    this.spectators.add(ws);
-    this.sendSpectatorSnapshot(ws);
-    return () => this.spectators.delete(ws);
+  /** `viewAs` — if set, spectator receives the fogged view of that player. */
+  attachSpectator(ws: WsLike, viewAs?: string): () => void {
+    const entry = { ws, viewAs };
+    this.spectators.add(entry);
+    this.sendToSpectator(entry);
+    return () => this.spectators.delete(entry);
   }
 
   sendSpectatorSnapshot(ws: WsLike): void {
@@ -236,6 +238,14 @@ export class MatchRuntime {
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
   }
 
+  private sendToSpectator(entry: { ws: WsLike; viewAs?: string }): void {
+    if (entry.viewAs) {
+      this.sendSnapshot(entry.ws, entry.viewAs);
+    } else {
+      this.sendSpectatorSnapshot(entry.ws);
+    }
+  }
+
   /**
    * Send each connected player a snapshot rendered for their viewer id —
    * filtered for fog of war. Without this, network observers can read
@@ -245,8 +255,8 @@ export class MatchRuntime {
     for (const conn of this.conns) {
       this.sendSnapshot(conn.ws, conn.playerId);
     }
-    for (const ws of this.spectators) {
-      this.sendSpectatorSnapshot(ws);
+    for (const entry of this.spectators) {
+      this.sendToSpectator(entry);
     }
   }
 

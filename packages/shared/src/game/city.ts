@@ -350,6 +350,13 @@ export function processPlayerTurn(
     }
   }
 
+  // Unit maintenance gold
+  for (const unit of units) {
+    if (unit.ownerId !== playerId) continue;
+    const def = content.units.find((u) => (u.id as unknown as string) === unit.defId);
+    if (def?.maintenance_gold) goldDelta -= def.maintenance_gold;
+  }
+
   // ----- Worker improvement ticks -----
   // Walk every tile with workInProgress for this player; check whether the
   // assigned worker is still on the tile. Tick down or cancel.

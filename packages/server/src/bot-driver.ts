@@ -1,7 +1,7 @@
-import { Hex, buildView, type Intent, type MatchView } from "@browserciv/shared";
+import { Hex, buildView, type ContentPack, type Intent, type MatchView } from "@browserciv/shared";
 import type { MatchRuntime } from "./runtime.js";
 
-type Brain = (state: MatchView, playerId: string) => Intent | null;
+type Brain = (state: MatchView, playerId: string, content: ContentPack) => Intent | null;
 
 // ── Strategies ───────────────────────────────────────────────────────────────
 
@@ -14,7 +14,7 @@ function pick<T>(arr: T[]): T | undefined {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-const randomBrain: Brain = (state: MatchView, playerId: string): Intent | null => {
+const randomBrain: Brain = (state: MatchView, playerId: string, content: ContentPack): Intent | null => {
   const myUnits = state.units.filter((u) => u.ownerId === playerId && u.movementLeft > 0);
   const tiles = new Map((state.map?.tiles ?? []).map((t) => [`${t.q},${t.r}`, t]));
   const occupiedKeys = new Set(state.units.map((u) => `${u.position.q},${u.position.r}`));
@@ -32,7 +32,11 @@ const randomBrain: Brain = (state: MatchView, playerId: string): Intent | null =
     const candidates = Hex.neighbors(unit.position).filter((n) => {
       const k = `${n.q},${n.r}`;
       const tile = tiles.get(k);
-      if (!tile || occupiedKeys.has(k)) return false;
+      if (!tile || occupiedKeys.has(k) || cityKeys.has(k)) return false;
+      const terrain = content.terrains.find((t) => (t.id as unknown as string) === tile.terrain);
+      if (!terrain) return false;
+      const cost = (terrain as Record<string, unknown>).movement_cost as number ?? 1;
+      if (cost > unit.movementLeft) return false;
       if (unit.defId === "unit.settler" || unit.defId === "unit.worker") {
         return LAND_TERRAINS.has(tile.terrain) && tile.terrain !== "mountain";
       }
@@ -54,13 +58,16 @@ const randomBrain: Brain = (state: MatchView, playerId: string): Intent | null =
 
   const me = state.players.find((p) => p.id === playerId);
   if (me && !me.currentTech) {
-    return { type: "SetResearch", actorId: playerId, techId: "tech.bronze_working" };
+    const researched = new Set(me.researchedTechs);
+    const next = ["tech.agriculture", "tech.mining", "tech.pottery", "tech.archery", "tech.bronze_working"]
+      .find((t) => !researched.has(t));
+    if (next) return { type: "SetResearch", actorId: playerId, techId: next };
   }
 
   return { type: "EndTurn", actorId: playerId };
 };
 
-const passiveBrain: Brain = (_state, playerId) =>
+const passiveBrain: Brain = (_state, playerId, _content) =>
   ({ type: "EndTurn", actorId: playerId });
 
 /**
@@ -72,12 +79,17 @@ const passiveBrain: Brain = (_state, playerId) =>
  *   4. Set research if none active
  *   5. End turn
  */
-const greedyBrain: Brain = (state: MatchView, playerId: string): Intent | null => {
+const greedyBrain: Brain = (state: MatchView, playerId: string, content: ContentPack): Intent | null => {
   const myUnits = state.units.filter((u) => u.ownerId === playerId);
   const myCities = state.cities.filter((c) => c.ownerId === playerId);
   const tiles = new Map((state.map?.tiles ?? []).map((t) => [`${t.q},${t.r}`, t]));
   const cityKeys = new Set(state.cities.map((c) => `${c.position.q},${c.position.r}`));
   const occupiedKeys = new Set(state.units.map((u) => `${u.position.q},${u.position.r}`));
+
+  const moveCost = (terrainId: string): number => {
+    const t = content.terrains.find((t) => (t.id as unknown as string) === terrainId);
+    return (t as Record<string, unknown>)?.movement_cost as number ?? 1;
+  };
 
   // 1. Found city with idle settler not already on a city tile
   const idleSettler = myUnits.find(
@@ -97,8 +109,9 @@ const greedyBrain: Brain = (state: MatchView, playerId: string): Intent | null =
     const candidates = Hex.neighbors(movableSettler.position).filter((n) => {
       const k = `${n.q},${n.r}`;
       const tile = tiles.get(k);
-      if (!tile || occupiedKeys.has(k)) return false;
-      if (tile.ownerCityId) return false; // already claimed
+      if (!tile || occupiedKeys.has(k) || cityKeys.has(k)) return false;
+      if (tile.ownerCityId) return false;
+      if (moveCost(tile.terrain) > movableSettler.movementLeft) return false;
       return LAND_TERRAINS.has(tile.terrain) && tile.terrain !== "mountain";
     });
     const target = pick(candidates);
@@ -123,7 +136,10 @@ const greedyBrain: Brain = (state: MatchView, playerId: string): Intent | null =
   // 4. Set research if none active
   const me = state.players.find((p) => p.id === playerId);
   if (me && !me.currentTech) {
-    return { type: "SetResearch", actorId: playerId, techId: "tech.bronze_working" };
+    const researched = new Set(me.researchedTechs);
+    const next = ["tech.agriculture", "tech.mining", "tech.pottery", "tech.archery", "tech.bronze_working"]
+      .find((t) => !researched.has(t));
+    if (next) return { type: "SetResearch", actorId: playerId, techId: next };
   }
 
   return { type: "EndTurn", actorId: playerId };
@@ -182,24 +198,24 @@ export class BotDriver {
       if (s.players[s.currentPlayerIndex]?.id !== this.playerId) break;
 
       const view = buildView(s, this.playerId, this.rt.content);
-      const intent = brain(view, this.playerId);
+      const intent = brain(view, this.playerId, this.rt.content);
       if (!intent) break;
 
       try {
         this.rt.applyIntent(this.playerId, intent);
-        this.rt.broadcastSnapshot();
       } catch (err) {
-        console.error(`[bot:${this.playerId}] intent rejected:`, err);
+        console.error(`[bot:${this.playerId}] intent rejected (${intent.type}):`, err instanceof Error ? err.message : err);
         // Force end-turn to avoid getting stuck.
         try {
           this.rt.applyIntent(this.playerId, { type: "EndTurn", actorId: this.playerId });
-          this.rt.broadcastSnapshot();
         } catch { /* ignore */ }
         break;
       }
 
       if (intent.type === "EndTurn") break;
     }
+    // Single broadcast after the entire turn, not after each intent.
+    this.rt.broadcastSnapshot();
   }
 
   destroy(): void {

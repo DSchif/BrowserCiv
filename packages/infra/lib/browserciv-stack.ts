@@ -73,10 +73,25 @@ export class BrowserCivStack extends cdk.Stack {
             HOST: "0.0.0.0",
             STATE_TABLE: stateTable.tableName,
             AWS_REGION: this.region,
+            SIM_SERVER_URL: "http://localhost:3334",
           },
         },
       },
     );
+
+    // Sim-server sidecar — same image, different command, not load-balanced.
+    // The game server proxies /sim/* /agents/* /runs/* to localhost:3334.
+    service.taskDefinition.addContainer("SimServer", {
+      image: ecs.ContainerImage.fromAsset(repoRoot),
+      command: ["pnpm", "--filter", "@browserciv/bot", "run", "sim-server", "--", "--no-spawn"],
+      portMappings: [{ containerPort: 3334 }],
+      environment: {
+        PORT: "3334",
+        HOST: "0.0.0.0",
+        GAME_SERVER_URL: "http://localhost:8787",
+      },
+      logging: new ecs.AwsLogDriver({ streamPrefix: "sim-server" }),
+    });
 
     // ALB health check hits /health (server returns {status:"ok"}).
     service.targetGroup.configureHealthCheck({

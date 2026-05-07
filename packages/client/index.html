@@ -238,6 +238,123 @@
       .lo-actions .lo-leave { background: none; border: 1px solid #30363d; color: #8b949e; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
       .lo-actions .lo-leave:hover { background: #21262d; }
       .lo-waiting { color: #8b949e; font-size: 12px; text-align: center; }
+
+      /* ── Simulation ──────────────────────────────────────────────────────── */
+      .sim-page { max-width: 960px; margin: 0 auto; padding: 24px; }
+      .sim-page h1 { margin-top: 0; font-size: 1.4rem; }
+      .sim-nav { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+      .sim-nav-btn { background: none; border: 1px solid #30363d; color: #8b949e; padding: 5px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+      .sim-nav-btn:hover { background: #21262d; color: #e6edf3; }
+      .sim-nav-btn.active { background: #1f6feb22; border-color: #1f6feb; color: #388bfd; }
+
+      .sim-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+      .sim-slot { background: #0e1116; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+      .sim-slot h3 { margin: 0 0 12px; font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.08em; }
+      .sim-slot label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; margin-bottom: 10px; }
+      .sim-slot select, .sim-slot input[type=text], .sim-slot input[type=number] { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; padding: 5px 8px; font-size: 13px; width: 100%; }
+      .sim-slot input[type=number] { width: 80px; }
+      .sim-agent-file { display: flex; gap: 6px; align-items: center; }
+      .sim-agent-file select { flex: 1; }
+
+      .sim-goals { margin-top: 10px; }
+      .sim-goals-title { font-size: 11px; color: #8b949e; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+      .sim-goal-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 12px; }
+      .sim-goal-row input[type=checkbox] { accent-color: #1f6feb; width: 14px; height: 14px; flex-shrink: 0; }
+      .sim-goal-row .goal-name { width: 60px; color: #c9d1d9; }
+      .sim-goal-row .goal-reward { display: flex; gap: 4px; align-items: center; flex: 1; flex-wrap: wrap; }
+      .sim-goal-row .goal-reward span { font-size: 11px; color: #8b949e; }
+      .sim-goal-row .goal-reward input { width: 56px; padding: 2px 5px; font-size: 11px; }
+
+      .sim-settings-row { display: flex; gap: 20px; align-items: flex-end; margin: 16px 0; flex-wrap: wrap; }
+      .sim-settings-row label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+      .sim-settings-row select, .sim-settings-row input { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; padding: 5px 8px; font-size: 13px; }
+      .sim-settings-row input[type=number] { width: 90px; }
+
+      .sim-start-btn { background: #238636; color: white; border: none; padding: 10px 28px; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: 700; margin-top: 8px; }
+      .sim-start-btn:hover { background: #2ea043; }
+
+      /* Runner layout */
+      .sim-runner-root { position: fixed; inset: 0; display: flex; flex-direction: column; background: #0e1116; }
+      .sim-topbar { height: 46px; background: rgba(13,17,23,0.98); border-bottom: 1px solid #30363d; display: flex; align-items: center; gap: 10px; padding: 0 14px; flex-shrink: 0; font-size: 12px; overflow: hidden; }
+      .sim-topbar-sep { width: 1px; height: 22px; background: #30363d; flex-shrink: 0; }
+      .sim-episode-badge { background: #1f6feb; color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+      .sim-turn-label { color: #c9d1d9; white-space: nowrap; }
+      .sim-state-label { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+      .sim-state-label.running { background: #1a4731; color: #7ee787; }
+      .sim-state-label.paused  { background: #3a2a00; color: #f0d040; }
+      .sim-state-label.done    { background: #161b22; color: #8b949e; }
+      .sim-ctrl-btn { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+      .sim-ctrl-btn:hover:not(:disabled) { background: #30363d; }
+      .sim-ctrl-btn.active { background: #1a4731; border-color: #2ea043; color: #7ee787; }
+      .sim-ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+      .sim-view-select { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 3px 8px; border-radius: 4px; font-size: 12px; }
+      .sim-reward-label { color: #8b949e; font-size: 11px; white-space: nowrap; }
+      .sim-reward-label span { color: #ffd700; }
+
+      .sim-body { flex: 1; display: flex; overflow: hidden; }
+      .sim-map-area { flex: 1; position: relative; overflow: hidden; }
+      .sim-map-area canvas { position: absolute; inset: 0; }
+
+      .sim-graph-panel { width: 300px; background: #161b22; border-left: 1px solid #30363d; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+      .sim-graph-header { padding: 8px 12px; border-bottom: 1px solid #30363d; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; font-size: 12px; }
+      .sim-graph-header span { color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
+      .sim-add-graph-btn { background: #1f6feb; color: white; border: none; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; }
+      .sim-add-graph-btn:hover { background: #388bfd; }
+      .sim-graph-list { flex: 1; overflow-y: auto; padding: 8px; }
+      .sim-graph-widget { background: #0e1116; border: 1px solid #30363d; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+      .sgw-header { display: flex; align-items: center; margin-bottom: 5px; }
+      .sgw-title { flex: 1; font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; }
+      .sgw-btn { background: none; border: none; color: #8b949e; cursor: pointer; padding: 0 3px; font-size: 13px; line-height: 1; }
+      .sgw-btn:hover { color: #e6edf3; }
+      .sgw-canvas-wrap { max-height: 160px; }
+
+      /* Modal */
+      .sim-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 200; display: flex; align-items: center; justify-content: center; }
+      .sim-modal { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; min-width: 340px; max-height: 80vh; overflow-y: auto; }
+      .sim-modal h3 { margin: 0 0 14px; font-size: 14px; }
+      .sim-modal-footer { margin-top: 14px; display: flex; gap: 8px; justify-content: flex-end; }
+      .sim-modal-footer button { padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; border: 1px solid #30363d; }
+      .sim-modal-footer .btn-primary { background: #1f6feb; color: white; border-color: #1f6feb; font-weight: 600; }
+      .sim-modal-footer .btn-primary:hover { background: #388bfd; }
+      .sim-modal-footer .btn-cancel { background: none; color: #8b949e; }
+      .sim-modal-footer .btn-cancel:hover { background: #21262d; }
+      .sim-metric-label { font-size: 11px; color: #8b949e; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+      .sim-metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-bottom: 12px; }
+      .sim-metric-grid label { font-size: 12px; display: flex; align-items: center; gap: 5px; padding: 3px 4px; border-radius: 3px; cursor: pointer; }
+      .sim-metric-grid label:hover { background: #21262d; }
+      .sim-metric-grid input[type=checkbox] { accent-color: #1f6feb; }
+      .sim-modal input[type=text] { background: #0e1116; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; padding: 5px 8px; font-size: 13px; width: 100%; margin-bottom: 10px; }
+
+      /* History */
+      .sim-history-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+      .sim-history-table th { text-align: left; padding: 6px 10px; color: #8b949e; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #30363d; }
+      .sim-history-table td { padding: 7px 10px; border-bottom: 1px solid #21262d; }
+      .sim-history-table tr:hover td { background: #161b22; cursor: pointer; }
+      .sim-agent-group { margin-bottom: 20px; }
+      .sim-agent-group h3 { font-size: 13px; color: #388bfd; margin: 0 0 6px; }
+
+      /* Results */
+      .sim-results-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .sim-results-table th { text-align: left; padding: 6px 10px; color: #8b949e; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #30363d; }
+      .sim-results-table td { padding: 6px 10px; border-bottom: 1px solid #21262d; }
+      .outcome-won  { color: #7ee787; font-weight: 600; }
+      .outcome-lost { color: #f85149; }
+      .outcome-draw { color: #8b949e; }
+      .sim-summary-stats { display: flex; gap: 24px; flex-wrap: wrap; margin: 16px 0; }
+      .sim-summary-stat { display: flex; flex-direction: column; }
+      .sim-summary-stat .label { font-size: 11px; color: #8b949e; text-transform: uppercase; }
+      .sim-summary-stat .value { font-size: 1.2rem; font-weight: 700; color: #ffd700; }
+      .sim-active-section { margin-top: 20px; }
+      .sim-active-header { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+      .sim-active-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      .sim-active-table th { text-align: left; padding: 5px 10px; color: #8b949e; font-size: 10px; text-transform: uppercase; border-bottom: 1px solid #30363d; white-space: nowrap; }
+      .sim-active-table td { padding: 6px 10px; border-bottom: 1px solid #21262d; vertical-align: middle; }
+      .sim-active-table tbody tr:hover { background: #161b22; }
+      .sim-active-actions { display: flex; gap: 4px; flex-wrap: nowrap; }
+      .asim-watch { background: #1a3a5c !important; border-color: #388bfd !important; color: #79c0ff !important; }
+      .asim-watch:hover { background: #1c4170 !important; }
+      .asim-stop { color: #f85149 !important; border-color: #6e2b2b !important; }
+      .asim-stop:hover { background: #3d1f1f !important; }
     </style>
   </head>
   <body>
