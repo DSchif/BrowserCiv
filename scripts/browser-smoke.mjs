@@ -26,6 +26,11 @@ async function main() {
   });
 
   await pageA.goto(URL);
+  await pageA.waitForSelector('button[data-tab="register"]');
+  await pageA.click('button[data-tab="register"]');
+  await pageA.fill("#reg-username", `smkalice${Date.now()}`);
+  await pageA.fill("#reg-password", "testpass");
+  await pageA.click("#reg-submit");
   await pageA.waitForSelector("#name");
   await pageA.fill("#name", "Alice");
   await pageA.selectOption("#size", "small");
@@ -44,6 +49,11 @@ async function main() {
   pageB.on("pageerror", (e) => errors2.push(`[B pageerror] ${e.message}`));
 
   await pageB.goto(URL);
+  await pageB.waitForSelector('button[data-tab="register"]');
+  await pageB.click('button[data-tab="register"]');
+  await pageB.fill("#reg-username", `smkbob${Date.now()}`);
+  await pageB.fill("#reg-password", "testpass");
+  await pageB.click("#reg-submit");
   await pageB.waitForSelector("#name");
   await pageB.fill("#name", "Bob");
   await pageB.click("#refresh");
