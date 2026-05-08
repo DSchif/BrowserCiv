@@ -7,7 +7,7 @@ import {
   RunInstancesCommand,
   DescribeInstancesCommand,
 } from "@aws-sdk/client-ec2";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
 const region = process.env.AWS_REGION ?? "us-east-1";
 const ec2 = new EC2Client({ region });
@@ -26,6 +26,10 @@ export interface PyTorchLaunchConfig {
   stepDelayMs?: number;
   hiddenLayers?: string;
   learningRate?: number;
+  /** S3 key of the agent zip to download (default: "agents/ppo-v1.zip"). */
+  agentZipKey?: string;
+  /** Python file inside the zip to run (default: "main.py"). */
+  entrypoint?: string;
   // Infrastructure
   amiId: string;
   instanceType?: string;
@@ -143,9 +147,32 @@ export async function describeTrainingInstance(instanceId: string) {
   return res.Reservations?.[0]?.Instances?.[0] ?? null;
 }
 
+export interface S3AgentEntry {
+  key: string;   // full S3 key, e.g. "agents/ppo-v1.zip"
+  name: string;  // display name, e.g. "ppo-v1"
+  entrypoint: string;  // python file to run, derived from zip metadata or defaulted to "main.py"
+}
+
+export async function listS3Agents(bucket: string): Promise<S3AgentEntry[]> {
+  try {
+    const res = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: "agents/", Delimiter: "/" }));
+    return (res.Contents ?? [])
+      .filter((o) => o.Key?.endsWith(".zip"))
+      .map((o) => {
+        const key  = o.Key!;
+        const name = key.replace(/^agents\//, "").replace(/\.zip$/, "");
+        return { key, name, entrypoint: "main.py" };
+      });
+  } catch {
+    return [];
+  }
+}
+
 // ── User-data script ──────────────────────────────────────────────────────────
 
 function buildUserData(cfg: PyTorchLaunchConfig & { liveKey: string; modelKey: string }): string {
+  const zipKey    = cfg.agentZipKey ?? "agents/ppo-v1.zip";
+  const entrypoint = cfg.entrypoint ?? "main.py";
   return `#!/bin/bash
 set -euo pipefail
 
@@ -158,11 +185,10 @@ _self_terminate() {
 }
 trap _self_terminate EXIT
 
-# Pre-baked AMI already has python3.11 + torch2.2+cpu + deps installed.
-# Just pull the latest agent code and run.
-aws s3 cp s3://${cfg.s3Bucket}/agent-py.zip /tmp/agent-py.zip
-unzip -q /tmp/agent-py.zip -d /tmp/agent-py
-cd /tmp/agent-py
+# Download the selected agent package and run its entrypoint.
+aws s3 cp s3://${cfg.s3Bucket}/${zipKey} /tmp/agent.zip
+unzip -q /tmp/agent.zip -d /tmp/agent
+cd /tmp/agent
 
 export GAME_SERVER="${cfg.gameServerUrl}"
 export MODEL_BUCKET="${cfg.s3Bucket}"
@@ -176,6 +202,6 @@ ${cfg.hiddenLayers  ? `export HIDDEN="${cfg.hiddenLayers}"` : ""}
 ${cfg.learningRate  ? `export LR="${cfg.learningRate}"` : ""}
 ${cfg.stepDelayMs  ? `export STEP_DELAY="${(cfg.stepDelayMs / 1000).toFixed(3)}"` : ""}
 
-python3.11 train_main.py || true
+python3.11 ${entrypoint} || true
 `;
 }

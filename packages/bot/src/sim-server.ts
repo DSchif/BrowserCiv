@@ -22,7 +22,7 @@ import { HierAgent } from "./agent2/hier-agent.js";
 import type { HierAgentConfig } from "./agent2/config.js";
 import { DEFAULT_HIER_CONFIG } from "./agent2/config.js";
 import { runHierTrainingEpisode, type StepController } from "./hier-train-runner.js";
-import { launchPyTorchTraining, getPyTorchLiveState, getS3Json } from "./ec2-training.js";
+import { launchPyTorchTraining, getPyTorchLiveState, getS3Json, listS3Agents } from "./ec2-training.js";
 import { snapTurn, type EpisodeDump, type TurnSnap } from "./dump.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -49,6 +49,10 @@ export interface BotSlotConfig {
   agentFile?: string;
   agentConfig?: HierAgentConfig;
   saveFile?: string;
+  /** S3 key of the agent zip (pytorch type only), e.g. "agents/ppo-v1.zip". */
+  agentZipKey?: string;
+  /** Python entrypoint inside the zip (default: "main.py"). */
+  entrypoint?: string;
 }
 
 export interface SimConfig {
@@ -581,6 +585,8 @@ class SimSession {
         episodes: this.cfg.episodes,
         maxTurns: this.cfg.maxTurns,
         stepDelayMs: this.cfg.stepDelayMs ?? 0,
+        agentZipKey: this.cfg.agentSlot.agentZipKey,
+        entrypoint: this.cfg.agentSlot.entrypoint,
         amiId,
         instanceProfileArn: profile,
         securityGroupId: sgId,
@@ -799,6 +805,14 @@ const server = createServer((req, res) => {
   // GET /agents
   if (method === "GET" && path === "/agents") {
     return json(res, listAgentFiles());
+  }
+
+  // GET /agents/s3  — list agent zips in S3 under agents/ prefix
+  if (method === "GET" && path === "/agents/s3") {
+    const bucket = process.env.MODEL_BUCKET ?? "";
+    if (!bucket) { json(res, []); return; }
+    void listS3Agents(bucket).then((agents) => json(res, agents));
+    return;
   }
 
   // GET /runs

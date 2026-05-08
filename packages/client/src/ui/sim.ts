@@ -73,6 +73,12 @@ async function getAgents(): Promise<AgentFile[]> {
   return r.ok ? (r.json() as Promise<AgentFile[]>) : [];
 }
 
+interface S3AgentEntry { key: string; name: string; entrypoint: string; }
+async function getS3Agents(): Promise<S3AgentEntry[]> {
+  const r = await simFetch("/agents/s3");
+  return r.ok ? (r.json() as Promise<S3AgentEntry[]>) : [];
+}
+
 async function getRuns(): Promise<RunMeta[]> {
   const r = await simFetch("/runs");
   return r.ok ? (r.json() as Promise<RunMeta[]>) : [];
@@ -202,8 +208,14 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
 
   function renderSetup(): void {
     void (async () => {
-      const agents = await getAgents().catch(() => [] as AgentFile[]);
+      const [agents, s3Agents] = await Promise.all([
+        getAgents().catch(() => [] as AgentFile[]),
+        getS3Agents().catch(() => [] as S3AgentEntry[]),
+      ]);
       const agentOptions = agents.map((a) => `<option value="${a.name}">${a.name} (${a.episodes} eps)</option>`).join("");
+      const s3AgentOptions = s3Agents.length
+        ? s3Agents.map((a) => `<option value="${a.key}" data-entrypoint="${a.entrypoint}">${a.name}</option>`).join("")
+        : `<option value="agents/ppo-v1.zip">ppo-v1 (default)</option>`;
 
       root.innerHTML = `
         <div class="sim-page">
@@ -219,13 +231,20 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
               <h3>Agent (Player 1)</h3>
               <label>Type
                 <select id="agent-type">
-                  <option value="pytorch">PyTorch PPO (EC2 spot)</option>
+                  <option value="pytorch">PyTorch (EC2 spot)</option>
                   <option value="hier">Hierarchical RL (in-process)</option>
                   <option value="greedy">Greedy</option>
                   <option value="random">Random</option>
                   <option value="passive">Passive</option>
                 </select>
               </label>
+              <div id="pytorch-opts">
+                <label>Agent package
+                  <select id="s3-agent-key">
+                    ${s3AgentOptions}
+                  </select>
+                </label>
+              </div>
               <div id="hier-opts">
                 <label>Agent file
                   <div class="sim-agent-file">
@@ -316,10 +335,11 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
       });
       root.querySelector("#agent-type")!.addEventListener("change", () => {
         const t = (root.querySelector<HTMLSelectElement>("#agent-type"))!.value;
-        const hierOpts = root.querySelector<HTMLElement>("#hier-opts")!;
-        hierOpts.style.display = t === "hier" ? "" : "none";
-        // pytorch uses EC2 — no in-process agent options needed
+        root.querySelector<HTMLElement>("#pytorch-opts")!.style.display = t === "pytorch" ? "" : "none";
+        root.querySelector<HTMLElement>("#hier-opts")!.style.display    = t === "hier"    ? "" : "none";
       });
+      // Initialise visibility for default selection (pytorch)
+      root.querySelector<HTMLElement>("#hier-opts")!.style.display = "none";
       root.querySelector("#opp-type")!.addEventListener("change", () => {
         const t = (root.querySelector<HTMLSelectElement>("#opp-type"))!.value;
         const oppHierOpts = root.querySelector<HTMLElement>("#opp-hier-opts")!;
@@ -357,9 +377,12 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
   }
 
   async function startSim(): Promise<void> {
-    const agentType = (root.querySelector<HTMLSelectElement>("#agent-type"))!.value as "hier" | "greedy" | "random" | "passive";
+    const agentType = (root.querySelector<HTMLSelectElement>("#agent-type"))!.value as "hier" | "greedy" | "random" | "passive" | "pytorch";
     const agentFile = agentType === "hier" ? (root.querySelector<HTMLSelectElement>("#agent-file"))!.value || undefined : undefined;
     const saveFile = agentType === "hier" ? ((root.querySelector<HTMLInputElement>("#agent-save"))!.value.trim() || undefined) : undefined;
+    const s3AgentSel = root.querySelector<HTMLSelectElement>("#s3-agent-key");
+    const agentZipKey = agentType === "pytorch" ? (s3AgentSel?.value || "agents/ppo-v1.zip") : undefined;
+    const entrypoint  = agentType === "pytorch" ? (s3AgentSel?.selectedOptions[0]?.dataset.entrypoint || "main.py") : undefined;
     const oppType = (root.querySelector<HTMLSelectElement>("#opp-type"))!.value as "hier" | "greedy" | "random" | "passive";
     const oppFile = oppType === "hier" ? (root.querySelector<HTMLSelectElement>("#opp-file"))!.value || undefined : undefined;
     const oppSave = oppType === "hier" ? ((root.querySelector<HTMLInputElement>("#opp-save"))!.value.trim() || undefined) : undefined;
@@ -372,7 +395,7 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     const agentConfig = agentType === "hier" ? buildAgentConfig() : undefined;
 
     const body = {
-      agentSlot: { type: agentType, agentFile, agentConfig, saveFile },
+      agentSlot: { type: agentType, agentFile, agentConfig, saveFile, agentZipKey, entrypoint },
       opponentSlot: { type: oppType, agentFile: oppFile, saveFile: oppSave },
       mapSize, episodes, maxTurns, stepDelayMs,
     };
