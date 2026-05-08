@@ -30,6 +30,8 @@ export interface PyTorchLaunchConfig {
   agentZipKey?: string;
   /** Python file inside the zip to run (default: "main.py"). */
   entrypoint?: string;
+  /** Reward weights forwarded as env vars (e.g. REWARD_KILL=2.0). */
+  rewardWeights?: Record<string, number>;
   // Infrastructure
   amiId: string;
   instanceType?: string;
@@ -201,6 +203,7 @@ export OPPONENT_STRATEGY="${cfg.opponentStrategy}"
 ${cfg.hiddenLayers  ? `export HIDDEN="${cfg.hiddenLayers}"` : ""}
 ${cfg.learningRate  ? `export LR="${cfg.learningRate}"` : ""}
 ${cfg.stepDelayMs  ? `export STEP_DELAY="${(cfg.stepDelayMs / 1000).toFixed(3)}"` : ""}
+${cfg.rewardWeights ? Object.entries(cfg.rewardWeights).map(([k, v]) => `export ${k}="${v}"`).join("\n") : ""}
 
 python3.11 ${entrypoint} || true
 `;

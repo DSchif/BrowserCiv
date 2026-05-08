@@ -112,6 +112,19 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
   let currentStatus: StatusEvent | null = null;
   let episodeLog: EpRecord[] = [];
   let goals: GoalWeightDef[] = DEFAULT_GOALS.map((g) => ({ ...g }));
+
+  const PYTORCH_REWARD_DEFS: Array<{ key: string; label: string; default: number }> = [
+    { key: "REWARD_WIN",  label: "Win",               default:  10.0  },
+    { key: "REWARD_LOSE", label: "Loss",               default: -10.0  },
+    { key: "REWARD_KILL", label: "Kill unit",          default:   1.0  },
+    { key: "REWARD_CITY", label: "Capture / found city", default: 2.0  },
+    { key: "REWARD_TECH", label: "Research tech",      default:   0.5  },
+    { key: "REWARD_UNIT", label: "Train unit",         default:   0.3  },
+    { key: "REWARD_TURN", label: "Per turn (penalty)", default:  -0.01 },
+  ];
+  let pytorchRewards: Record<string, number> = Object.fromEntries(
+    PYTORCH_REWARD_DEFS.map((d) => [d.key, d.default]),
+  );
   let latestMatchState: unknown = null;
   let renderRafId: number | null = null;
 
@@ -248,6 +261,17 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
                     ${s3AgentOptions}
                   </select>
                 </label>
+                <div class="sim-goals">
+                  <div class="sim-goals-title" id="pytorch-rewards-toggle">▸ Reward Weights</div>
+                  <div id="pytorch-rewards-body" style="display:none">
+                    ${PYTORCH_REWARD_DEFS.map((d) => `
+                      <div class="sim-goal-row">
+                        <span class="goal-name">${d.label}</span>
+                        <input type="number" class="goal-w pytorch-reward-input" data-key="${d.key}"
+                               value="${pytorchRewards[d.key]}" step="0.1">
+                      </div>`).join("")}
+                  </div>
+                </div>
               </div>
               <div id="hier-opts">
                 <label>Agent file
@@ -336,6 +360,18 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
         body.style.display = visible ? "none" : "block";
         toggle.textContent = (visible ? "▸" : "▾") + " Goals & Rewards";
       });
+      root.querySelector("#pytorch-rewards-toggle")!.addEventListener("click", () => {
+        const body = root.querySelector<HTMLElement>("#pytorch-rewards-body")!;
+        const toggle = root.querySelector("#pytorch-rewards-toggle")!;
+        const visible = body.style.display !== "none";
+        body.style.display = visible ? "none" : "block";
+        toggle.textContent = (visible ? "▸" : "▾") + " Reward Weights";
+      });
+      root.querySelectorAll<HTMLInputElement>(".pytorch-reward-input").forEach((el) => {
+        el.addEventListener("input", () => {
+          pytorchRewards[el.dataset.key!] = parseFloat(el.value) || 0;
+        });
+      });
       root.querySelector("#agent-type")!.addEventListener("change", () => {
         const t = (root.querySelector<HTMLSelectElement>("#agent-type"))!.value;
         root.querySelector<HTMLElement>("#pytorch-opts")!.style.display = t === "pytorch" ? "" : "none";
@@ -396,9 +432,10 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
 
     // Build agent config from goals
     const agentConfig = agentType === "hier" ? buildAgentConfig() : undefined;
+    const rewardWeights = agentType === "pytorch" ? { ...pytorchRewards } : undefined;
 
     const body = {
-      agentSlot: { type: agentType, agentFile, agentConfig, saveFile, agentZipKey, entrypoint },
+      agentSlot: { type: agentType, agentFile, agentConfig, saveFile, agentZipKey, entrypoint, rewardWeights },
       opponentSlot: { type: oppType, agentFile: oppFile, saveFile: oppSave },
       mapSize, episodes, maxTurns, stepDelayMs,
     };

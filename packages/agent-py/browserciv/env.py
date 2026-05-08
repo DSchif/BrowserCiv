@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import numpy as np
 import websockets
 import websockets.exceptions
@@ -8,13 +9,13 @@ from .constants import ACT_DIM, OBS_DIM
 from .encoder import encode_state, decode_action
 
 
-REWARD_WIN = 10.0
-REWARD_LOSE = -10.0
-REWARD_CITY = 2.0
-REWARD_TECH = 0.5
-REWARD_KILL = 1.0
-REWARD_UNIT = 0.3
-REWARD_TURN = -0.01
+REWARD_WIN  = float(os.environ.get("REWARD_WIN",   "10.0"))
+REWARD_LOSE = float(os.environ.get("REWARD_LOSE", "-10.0"))
+REWARD_CITY = float(os.environ.get("REWARD_CITY",   "2.0"))
+REWARD_TECH = float(os.environ.get("REWARD_TECH",   "0.5"))
+REWARD_KILL = float(os.environ.get("REWARD_KILL",   "1.0"))
+REWARD_UNIT = float(os.environ.get("REWARD_UNIT",   "0.3"))
+REWARD_TURN = float(os.environ.get("REWARD_TURN",  "-0.01"))
 
 _RECV_TIMEOUT = 30.0   # seconds before we assume the game server is stuck
 _MAX_REJECTS  = 10     # consecutive IntentRejects before we abort the step

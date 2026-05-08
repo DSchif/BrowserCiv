@@ -53,6 +53,8 @@ export interface BotSlotConfig {
   agentZipKey?: string;
   /** Python entrypoint inside the zip (default: "main.py"). */
   entrypoint?: string;
+  /** Reward weights forwarded as env vars to the EC2 agent (pytorch only). */
+  rewardWeights?: Record<string, number>;
 }
 
 export interface SimConfig {
@@ -588,6 +590,7 @@ class SimSession {
         stepDelayMs: this.cfg.stepDelayMs ?? 0,
         agentZipKey: this.cfg.agentSlot.agentZipKey,
         entrypoint: this.cfg.agentSlot.entrypoint,
+        rewardWeights: this.cfg.agentSlot.rewardWeights,
         amiId,
         instanceProfileArn: profile,
         securityGroupId: sgId,
