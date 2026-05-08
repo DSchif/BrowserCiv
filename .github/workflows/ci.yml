@@ -145,6 +145,7 @@ jobs:
         run: pnpm exec cdk deploy BrowserCivStack --require-approval never --outputs-file /tmp/cdk-outputs.json
 
       - name: Package and upload agent-py to S3
+        if: hashFiles('packages/agent-py/train_main.py') != ''
         run: |
           MODEL_BUCKET=$(jq -r '.BrowserCivStack.ModelBucketName' /tmp/cdk-outputs.json)
           cd packages/agent-py
