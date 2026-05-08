@@ -60,7 +60,7 @@ interface ActiveSession {
   turn: number; maxTurns: number; spectatorToken: string | null;
   matchId: string | null; runId: string | null; episodeLog: EpRecord[];
   agentPlayerId: string | null;
-  displayInfo: { agentType: string; agentFile: string | null; saveFile: string | null; opponentType: string; opponentFile: string | null; mapSize: string; } | null;
+  displayInfo: { agentType: string; agentFile: string | null; agentZipKey: string | null; saveFile: string | null; opponentType: string; opponentFile: string | null; mapSize: string; } | null;
 }
 
 async function getActiveSessions(): Promise<ActiveSession[]> {
@@ -134,9 +134,11 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     const rows = sessions.map((s) => {
       const info = s.displayInfo;
       const agentLabel = !info ? "—"
-        : info.agentType === "hier"
-          ? `RL ${info.agentFile ? `(${info.agentFile})` : "(fresh)"}`
-          : info.agentType;
+        : info.agentType === "pytorch"
+          ? `EC2 ${info.agentZipKey ? info.agentZipKey.replace(/^agents\//, "").replace(/\.zip$/, "") : "ppo"}`
+          : info.agentType === "hier"
+            ? `RL ${info.agentFile ? `(${info.agentFile})` : "(fresh)"}`
+            : info.agentType;
       const oppLabel = !info ? "—"
         : info.opponentType === "hier"
           ? `RL ${info.opponentFile ? `(${info.opponentFile})` : "(fresh)"}`
@@ -225,6 +227,8 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
             <button class="sim-nav-btn" id="btn-back" style="margin-left:auto">← Lobby</button>
           </div>
 
+          <div id="active-sims"></div>
+
           <div class="sim-slots">
             <!-- Agent slot -->
             <div class="sim-slot">
@@ -312,7 +316,6 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
 
           <button class="sim-start-btn" id="start-sim">▶ Start Simulation</button>
           <div class="lobby" style="margin-top:8px"><div class="error" id="sim-err"></div></div>
-          <div id="active-sims"></div>
         </div>
       `;
 

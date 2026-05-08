@@ -267,6 +267,7 @@ class SimSession {
       displayInfo: this.cfg.agentSlot ? {
         agentType: this.cfg.agentSlot.type,
         agentFile: this.cfg.agentSlot.agentFile ?? null,
+        agentZipKey: this.cfg.agentSlot.agentZipKey ?? null,
         saveFile: this.cfg.agentSlot.saveFile ?? null,
         opponentType: this.cfg.opponentSlot?.type ?? "unknown",
         opponentFile: this.cfg.opponentSlot?.agentFile ?? null,
