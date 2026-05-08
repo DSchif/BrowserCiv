@@ -180,20 +180,37 @@ export class MapViewer {
     canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
     let panning = false;
+    let panStartX = 0;
+    let panStartY = 0;
     let panLastX = 0;
     let panLastY = 0;
+    let panPointerId = -1;
+    const PAN_THRESHOLD = 5;
 
     canvas.addEventListener("pointerdown", (e) => {
-      // Right-click or middle-click drag to pan.
+      // Left, middle, or right button all pan; left-click taps still reach PIXI
+      // sprites because we defer capture until the pointer actually moves (threshold).
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      panLastX = e.clientX;
+      panLastY = e.clientY;
+      panPointerId = e.pointerId;
       if (e.button === 2 || e.button === 1) {
+        // Middle/right: activate immediately (no conflict with selection).
         panning = true;
-        panLastX = e.clientX;
-        panLastY = e.clientY;
         canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
       }
     });
     canvas.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== panPointerId) return;
+      const movedX = e.clientX - panStartX;
+      const movedY = e.clientY - panStartY;
+      // Activate left-button panning once the pointer has moved past the threshold.
+      if (!panning && e.buttons === 1 && (Math.abs(movedX) > PAN_THRESHOLD || Math.abs(movedY) > PAN_THRESHOLD)) {
+        panning = true;
+        try { canvas.setPointerCapture(e.pointerId); } catch {}
+      }
       if (!panning) return;
       const dx = e.clientX - panLastX;
       const dy = e.clientY - panLastY;
@@ -209,6 +226,7 @@ export class MapViewer {
           canvas.releasePointerCapture(e.pointerId);
         } catch {}
       }
+      panPointerId = -1;
     };
     canvas.addEventListener("pointerup", stopPan);
     canvas.addEventListener("pointercancel", stopPan);
@@ -767,6 +785,18 @@ export class MapViewer {
         bar.eventMode = "none";
         node.addChild(bar);
       }
+    }
+
+    if (c.hp < c.hpMax) {
+      const barW = HEX_SIZE * 1.6;
+      const pct = Math.max(0, c.hp / c.hpMax);
+      const barColor = pct > 0.6 ? 0x2ea043 : pct > 0.3 ? 0xd29922 : 0xf85149;
+      const bar = new Graphics();
+      bar.rect(-barW / 2, 0, barW, 5).fill({ color: 0x1a0000, alpha: 0.9 });
+      bar.rect(-barW / 2, 0, barW * pct, 5).fill({ color: barColor, alpha: 1 });
+      bar.y = HEX_SIZE * 0.55;
+      bar.eventMode = "none";
+      node.addChild(bar);
     }
 
     return node;

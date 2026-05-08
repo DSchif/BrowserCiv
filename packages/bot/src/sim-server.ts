@@ -22,6 +22,7 @@ import { HierAgent } from "./agent2/hier-agent.js";
 import type { HierAgentConfig } from "./agent2/config.js";
 import { DEFAULT_HIER_CONFIG } from "./agent2/config.js";
 import { runHierTrainingEpisode, type StepController } from "./hier-train-runner.js";
+import { launchPyTorchTraining, getPyTorchLiveState, getS3Json } from "./ec2-training.js";
 import { snapTurn, type EpisodeDump, type TurnSnap } from "./dump.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -44,7 +45,7 @@ const NO_SPAWN = flag("--no-spawn");
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface BotSlotConfig {
-  type: "hier" | "greedy" | "random" | "passive";
+  type: "hier" | "greedy" | "random" | "passive" | "pytorch";
   agentFile?: string;
   agentConfig?: HierAgentConfig;
   saveFile?: string;
@@ -57,6 +58,7 @@ export interface SimConfig {
   episodes: number;
   maxTurns: number;
   gameServerUrl?: string;
+  stepDelayMs?: number;
 }
 
 type SimState = "idle" | "running" | "paused" | "done" | "aborted";
@@ -121,6 +123,7 @@ class SimSession {
   spectatorToken: string | null = null;
   matchId: string | null = null;
   agentPlayerId: string | null = null;
+  gameServerUrl: string | null = null;
   readonly sseClients = new Set<ServerResponse>();
   readonly episodeLog: EpRecord[] = [];
   runDir: string | null = null;
@@ -199,6 +202,9 @@ class SimSession {
       getDelayMs(): number {
         return session.speedDelayMs;
       },
+      isActive(): boolean {
+        return !session.paused && !session.aborted;
+      },
     };
   }
 
@@ -237,6 +243,7 @@ class SimSession {
       matchId: this.matchId,
       runId: this.runId,
       agentPlayerId: this.agentPlayerId,
+      gameServerUrl: this.gameServerUrl,
     });
   }
 
@@ -253,14 +260,14 @@ class SimSession {
       runId: this.runId,
       agentPlayerId: this.agentPlayerId,
       episodeLog: this.episodeLog,
-      displayInfo: {
+      displayInfo: this.cfg.agentSlot ? {
         agentType: this.cfg.agentSlot.type,
         agentFile: this.cfg.agentSlot.agentFile ?? null,
         saveFile: this.cfg.agentSlot.saveFile ?? null,
-        opponentType: this.cfg.opponentSlot.type,
-        opponentFile: this.cfg.opponentSlot.agentFile ?? null,
+        opponentType: this.cfg.opponentSlot?.type ?? "unknown",
+        opponentFile: this.cfg.opponentSlot?.agentFile ?? null,
         mapSize: this.cfg.mapSize,
-      },
+      } : null,
     };
   }
 
@@ -282,9 +289,17 @@ class SimSession {
       return;
     }
 
-    // Build agent
+    // PyTorch path — launch EC2 spot, poll S3 live.json, stream SSE
+    if (this.cfg.agentSlot.type === "pytorch") {
+      await this.startPyTorch();
+      return;
+    }
+
+    // Build agent — deep-merge provided config over defaults so partial configs work
     const slot = this.cfg.agentSlot;
-    const agentCfg = slot.agentConfig ?? DEFAULT_HIER_CONFIG;
+    const agentCfg: HierAgentConfig = slot.agentConfig
+      ? { ...DEFAULT_HIER_CONFIG, ...slot.agentConfig, features: { ...DEFAULT_HIER_CONFIG.features, ...(slot.agentConfig.features ?? {}) } }
+      : DEFAULT_HIER_CONFIG;
     this.agent = new HierAgent(agentCfg, this.content);
 
     if (slot.agentFile) {
@@ -318,7 +333,9 @@ class SimSession {
 
     // Build opponent RL agent if needed
     if (isRlVsRl) {
-      const oppCfg = oppSlot.agentConfig ?? DEFAULT_HIER_CONFIG;
+      const oppCfg: HierAgentConfig = oppSlot.agentConfig
+        ? { ...DEFAULT_HIER_CONFIG, ...oppSlot.agentConfig, features: { ...DEFAULT_HIER_CONFIG.features, ...(oppSlot.agentConfig.features ?? {}) } }
+        : DEFAULT_HIER_CONFIG;
       this.agent2 = new HierAgent(oppCfg, this.content);
       if (oppSlot.agentFile) {
         const oppPath = resolve(BOT_DIR, oppSlot.agentFile);
@@ -524,6 +541,166 @@ class SimSession {
     this.emit("done", { summary: this.episodeLog });
     this.emitStatus();
   }
+
+  // ── PyTorch / EC2 path ──────────────────────────────────────────────────────
+
+  log(message: string): void {
+    const ts = new Date().toISOString();
+    console.log(`[sim-server] ${message}`);
+    this.emit("log", { message, ts });
+  }
+
+  private async startPyTorch(): Promise<void> {
+    const bucket  = process.env.MODEL_BUCKET ?? "";
+    const amiId   = process.env.TRAINING_AMI_ID ?? "";
+    const profile = process.env.TRAINING_INSTANCE_PROFILE ?? "";
+    const sgId    = process.env.TRAINING_SG_ID ?? "";
+    const subnet  = process.env.TRAINING_SUBNET_ID ?? "";
+    const extUrl  = process.env.GAME_SERVER_EXTERNAL ?? this.cfg.gameServerUrl ?? SERVER_URL;
+
+    if (!bucket || !amiId || !profile || !sgId || !subnet) {
+      this.log("ERROR: PyTorch training not configured — missing env vars (MODEL_BUCKET, TRAINING_AMI_ID, etc.)");
+      this.state = "aborted";
+      this.emitStatus();
+      return;
+    }
+
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const runPrefix = `runs/${ts}`;
+
+    this.log(`Launching EC2 spot instance (${amiId}, c5.2xlarge) in subnet ${subnet} …`);
+
+    let handle: { instanceId: string; liveKey: string };
+    try {
+      handle = await launchPyTorchTraining({
+        gameServerUrl: extUrl,
+        s3Bucket: bucket,
+        runPrefix,
+        mapSize: this.cfg.mapSize,
+        opponentStrategy: this.cfg.opponentSlot.type === "pytorch" ? "random" : this.cfg.opponentSlot.type,
+        episodes: this.cfg.episodes,
+        maxTurns: this.cfg.maxTurns,
+        stepDelayMs: this.cfg.stepDelayMs ?? 0,
+        amiId,
+        instanceProfileArn: profile,
+        securityGroupId: sgId,
+        subnetId: subnet,
+      });
+    } catch (e) {
+      this.log(`ERROR: EC2 launch failed — ${(e as Error).message}`);
+      this.state = "aborted";
+      this.emitStatus();
+      return;
+    }
+
+    this.runId = runPrefix;
+    this.gameServerUrl = extUrl;
+    this.log(`EC2 instance ${handle.instanceId} launched. Waiting for training to begin …`);
+    this.log(`Game server: ${extUrl}`);
+    this.log(`S3 run prefix: s3://${bucket}/${runPrefix}`);
+    this.log(`Polling s3://${bucket}/${handle.liveKey} every 3s for live state`);
+
+    let lastEpisode = -1;
+    let pollsWithoutData = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let specWs: any = null;
+    let latestSpecState: MatchView | null = null;
+    let specMatchId: string | null = null;
+    let specPlayerId: string | null = null;
+    let currentKills = 0;
+    let currentCaptures = 0;
+
+    const wsUrl = (this.cfg.gameServerUrl ?? SERVER_URL)
+      .replace("https://", "wss://").replace("http://", "ws://");
+
+    const connectSpec = (matchId: string, token: string, agentPlayerId: string) => {
+      if (specWs) { try { specWs.close(); } catch { /**/ } }
+      latestSpecState = null;
+      specMatchId = matchId;
+      specPlayerId = agentPlayerId;
+
+      const doConnect = () => {
+        if (specMatchId !== matchId || this.aborted) return; // superseded by newer episode
+        const ws = new WebSocket(`${wsUrl}/ws?token=${token}`);
+        specWs = ws;
+        ws.on("message", (raw: Buffer) => {
+          try {
+            const msg = JSON.parse(String(raw)) as { type: string; state?: MatchView };
+            if (msg.type === "Snapshot" && msg.state) {
+              latestSpecState = msg.state as MatchView;
+              if (specPlayerId) {
+                const snap = snapTurn(latestSpecState, specPlayerId, currentKills, currentCaptures);
+                this.currentTurn = snap.turn;
+                this.emit("snapshot", { episode: this.currentEpisode, turn: snap.turn, snap });
+              }
+            }
+          } catch { /**/ }
+        });
+        ws.on("close", () => {
+          if (specMatchId === matchId && !this.aborted) {
+            this.log(`[spec] WS closed for ep ${this.currentEpisode} — reconnecting in 3s`);
+            setTimeout(doConnect, 3000);
+          }
+        });
+        ws.on("error", (err: Error) => {
+          this.log(`[spec] WS error: ${err.message}`);
+          // close event fires after error and handles reconnect
+        });
+      };
+      doConnect();
+    };
+
+    // Poll S3 live.json until done or aborted
+    while (!this.aborted) {
+      await new Promise<void>((r) => setTimeout(r, 3000));
+      const live = await getPyTorchLiveState(bucket, handle.liveKey);
+
+      if (!live) {
+        pollsWithoutData++;
+        if (pollsWithoutData === 5)  this.log("Instance booting — downloading agent-py.zip from S3 …");
+        if (pollsWithoutData === 15) this.log("Installing Python dependencies (torch, aiohttp) …");
+        if (pollsWithoutData === 25) this.log("Still waiting — instance may be initialising or pip install is running …");
+        continue;
+      }
+
+      pollsWithoutData = 0;
+
+      // Connect spectator WS for each new episode so we can get real game metrics.
+      if (live.episode !== lastEpisode) {
+        this.log(`Episode ${live.episode + 1}/${live.totalEpisodes} started — match ${live.matchId ?? "?"}`);
+        lastEpisode = live.episode;
+        if (live.matchId && live.spectatorToken && live.agentPlayerId) {
+          connectSpec(live.matchId, live.spectatorToken, live.agentPlayerId);
+        }
+      }
+
+      currentKills    = live.cumKills ?? 0;
+      currentCaptures = live.cumCaptures ?? 0;
+      this.currentEpisode = live.episode;
+      this.currentTurn    = live.turn;
+      this.matchId        = live.matchId;
+      this.spectatorToken = live.spectatorToken;
+      if (live.agentPlayerId) this.agentPlayerId = live.agentPlayerId;
+      this.state          = live.done ? "done" : "running";
+      this.emitStatus();
+
+      if (live.done) {
+        this.log(`Training complete — ${live.totalEpisodes} episodes finished.`);
+        const sw = specWs;
+        if (sw) { try { sw.close(); } catch { /**/ } }
+        break;
+      }
+    }
+
+    if (!this.aborted) {
+      // Read per-episode records from the progress.json the training script wrote.
+      const progressKey = `${runPrefix}/model.pt.progress.json`;
+      const progress = await getS3Json(bucket, progressKey) as { records?: unknown[] } | null;
+      const summary = progress?.records ?? [];
+      this.emit("done", { summary });
+    }
+    this.emitStatus();
+  }
 }
 
 // ── Run management ────────────────────────────────────────────────────────────
@@ -667,6 +844,12 @@ const server = createServer((req, res) => {
   if (method === "POST" && path === "/sim") {
     void (async () => {
       const body = (await readBody(req)) as SimConfig;
+      if (!body?.agentSlot || !body?.opponentSlot) {
+        cors(res);
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Missing agentSlot or opponentSlot in body" }));
+        return;
+      }
       const id = String(nextSimId++);
       const session = new SimSession(id, body);
       sessions.set(id, session);

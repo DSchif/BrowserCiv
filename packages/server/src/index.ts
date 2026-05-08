@@ -8,16 +8,18 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { allTokens, loadTokensIntoMap, setTokenChangeListener } from "./auth.js";
 import { loadContentPack } from "./content.js";
-import { putMatch } from "./match-store.js";
+import { putMatch, deleteMatch } from "./match-store.js";
 import {
   loadAllMatches,
   loadTokens,
   persistMatch,
   persistTokens,
+  deleteMatchPersisted,
 } from "./persistence.js";
 import { registerAccountRoutes } from "./routes/account.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerMatchRoutes } from "./routes/matches.js";
+import { registerTrainingRoutes } from "./routes/training.js";
 import { setApplyListener } from "./runtime.js";
 import { registerWsRoutes } from "./ws.js";
 
@@ -59,9 +61,32 @@ if (restoredMatches.length || restoredTokens.length) {
   );
 }
 
-// Persist on every apply / token mutation.
+// Persist on apply, debounced per match to avoid a write-per-action storm
+// during bot turns (which can fire 10+ applies per turn).
+// On game-end we persist immediately and schedule match cleanup.
+const pendingPersists = new Map<string, ReturnType<typeof setTimeout>>();
 setApplyListener((rt) => {
-  void persistMatch(rt);
+  if (rt.state.status === "finished") {
+    // Persist the final state immediately.
+    const h = pendingPersists.get(rt.state.id);
+    if (h) { clearTimeout(h); pendingPersists.delete(rt.state.id); }
+    void persistMatch(rt);
+    // Remove from in-memory store after a short grace period (lets spectators
+    // finish disconnecting) and clean up persisted storage too.
+    const matchId = rt.state.id;
+    setTimeout(() => {
+      deleteMatch(matchId);
+      void deleteMatchPersisted(matchId);
+    }, 5 * 60 * 1000);
+    return;
+  }
+  const existing = pendingPersists.get(rt.state.id);
+  if (existing) clearTimeout(existing);
+  const handle = setTimeout(() => {
+    pendingPersists.delete(rt.state.id);
+    void persistMatch(rt);
+  }, 500);
+  pendingPersists.set(rt.state.id, handle);
 });
 setTokenChangeListener(() => {
   void persistTokens(allTokens());
@@ -73,6 +98,7 @@ app.get("/content-pack", async () => content);
 await registerAccountRoutes(app);
 await registerAdminRoutes(app);
 await registerMatchRoutes(app);
+await registerTrainingRoutes(app);
 await registerWsRoutes(app);
 
 const SIM_SERVER_URL = process.env.SIM_SERVER_URL;

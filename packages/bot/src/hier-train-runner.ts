@@ -10,6 +10,8 @@ export interface StepController {
   shouldPause(): boolean;
   waitForResume(): Promise<void>;
   getDelayMs?(): number;
+  /** Return false while intentionally paused so the stall timer doesn't fire. */
+  isActive?(): boolean;
 }
 
 function wsUrl(serverUrl: string, token: string): string {
@@ -41,7 +43,7 @@ export async function runHierTrainingEpisode(opts: {
   const {
     serverUrl, matchId, agentToken, playerId,
     agent, content, verbose,
-    stallTimeoutMs = 3 * 60 * 1000,
+    stallTimeoutMs = 45_000,
     stepController,
     stepDelayMs = 0,
     onTurnSnap,
@@ -69,6 +71,11 @@ export async function runHierTrainingEpisode(opts: {
 
     const stallTimer = setInterval(() => {
       if (settled) { clearInterval(stallTimer); return; }
+      // Don't count stall time while intentionally paused.
+      if (stepController?.isActive?.() === false) {
+        lastSnapshotAt = Date.now();
+        return;
+      }
       const stalled = Date.now() - lastSnapshotAt;
       if (stalled > stallTimeoutMs) {
         clearInterval(stallTimer);

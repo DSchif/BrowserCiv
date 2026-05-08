@@ -161,7 +161,20 @@ export function resolveMelee(
   // Civ-V flavored: 30 base damage at parity, modulated by ratios + multipliers.
   const aPower = attack.damage * aHpRatio * aFort;
   const dPower = (retaliation?.damage ?? dDef.combat.strength) * dHpRatio * dFort;
-  if (aPower <= 0 || dPower <= 0) return ZERO_RESULT;
+  if (aPower <= 0) return ZERO_RESULT;
+
+  // Civilian units (workers, settlers) have dPower=0 — they can't retaliate but
+  // still take damage. Treat as a one-sided attack: attacker is unharmed.
+  if (dPower <= 0) {
+    const defenderDamage = clampHp(Math.round(aPower * aMult));
+    return {
+      attackerDamage: 0,
+      defenderDamage,
+      attackerKilled: false,
+      defenderKilled: defender.hp - defenderDamage <= 0,
+      effectiveness: aMult,
+    };
+  }
 
   const ratio = aPower / dPower;
   const defenderDamage = clampHp(Math.round(30 * Math.pow(ratio, 0.5) * aMult));

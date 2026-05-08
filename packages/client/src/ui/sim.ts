@@ -19,7 +19,7 @@ interface RunMeta {
   summary?: { wins: number; losses: number; draws: number; totalKills: number; totalCaptures: number; avgReward: number; };
 }
 interface EpRecord { episode: number; outcome: string; reward: number; turns: number; kills: number; captures: number; managerEpsilon?: number; tacticalEpsilon?: number; }
-interface StatusEvent { state: string; episode: number; totalEpisodes: number; turn: number; maxTurns: number; spectatorToken: string | null; matchId: string | null; runId: string | null; agentPlayerId: string | null; }
+interface StatusEvent { state: string; episode: number; totalEpisodes: number; turn: number; maxTurns: number; spectatorToken: string | null; matchId: string | null; runId: string | null; agentPlayerId: string | null; gameServerUrl: string | null; }
 
 interface GoalWeightDef {
   id: string; label: string; enabled: boolean;
@@ -38,8 +38,21 @@ const DEFAULT_GOALS: GoalWeightDef[] = [
 
 // ── Sim API helpers ───────────────────────────────────────────────────────────
 
+function authHeader(): Record<string, string> {
+  const token = localStorage.getItem("browserciv_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function simFetch(path: string, opts?: RequestInit): Promise<Response> {
-  return fetch(path, opts);
+  const hasBody = opts?.body != null;
+  return fetch(path, {
+    ...opts,
+    headers: {
+      ...(hasBody ? { "content-type": "application/json" } : {}),
+      ...authHeader(),
+      ...(opts?.headers ?? {}),
+    },
+  });
 }
 
 interface ActiveSession {
@@ -166,7 +179,7 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
         void simFetch(`/sim/${s.id}/pause`, { method: "POST" });
       });
       row.querySelector(".asim-resume")?.addEventListener("click", () => {
-        void simFetch(`/sim/${s.id}/resume`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ speed: "fast" }) });
+        void simFetch(`/sim/${s.id}/resume`, { method: "POST", body: JSON.stringify({ speed: "fast" }) });
       });
       row.querySelector(".asim-step")?.addEventListener("click", () => {
         void simFetch(`/sim/${s.id}/step`, { method: "POST" });
@@ -206,7 +219,8 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
               <h3>Agent (Player 1)</h3>
               <label>Type
                 <select id="agent-type">
-                  <option value="hier">Hierarchical RL</option>
+                  <option value="pytorch">PyTorch PPO (EC2 spot)</option>
+                  <option value="hier">Hierarchical RL (in-process)</option>
                   <option value="greedy">Greedy</option>
                   <option value="random">Random</option>
                   <option value="passive">Passive</option>
@@ -272,6 +286,9 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
             <label>Max turns
               <input type="number" id="max-turns" value="500" min="50" max="9999">
             </label>
+            <label title="Delay between agent actions (0 = max speed, use 0.3–1s to see the map update)">Step delay (s)
+              <input type="number" id="step-delay" value="0.3" min="0" max="5" step="0.1">
+            </label>
           </div>
 
           <button class="sim-start-btn" id="start-sim">▶ Start Simulation</button>
@@ -301,6 +318,7 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
         const t = (root.querySelector<HTMLSelectElement>("#agent-type"))!.value;
         const hierOpts = root.querySelector<HTMLElement>("#hier-opts")!;
         hierOpts.style.display = t === "hier" ? "" : "none";
+        // pytorch uses EC2 — no in-process agent options needed
       });
       root.querySelector("#opp-type")!.addEventListener("change", () => {
         const t = (root.querySelector<HTMLSelectElement>("#opp-type"))!.value;
@@ -348,6 +366,7 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     const mapSize = (root.querySelector<HTMLSelectElement>("#map-size"))!.value as "small" | "medium" | "large";
     const episodes = parseInt((root.querySelector<HTMLInputElement>("#episodes"))!.value, 10);
     const maxTurns = parseInt((root.querySelector<HTMLInputElement>("#max-turns"))!.value, 10);
+    const stepDelayMs = Math.round(parseFloat((root.querySelector<HTMLInputElement>("#step-delay"))!.value) * 1000) || 0;
 
     // Build agent config from goals
     const agentConfig = agentType === "hier" ? buildAgentConfig() : undefined;
@@ -355,10 +374,10 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     const body = {
       agentSlot: { type: agentType, agentFile, agentConfig, saveFile },
       opponentSlot: { type: oppType, agentFile: oppFile, saveFile: oppSave },
-      mapSize, episodes, maxTurns,
+      mapSize, episodes, maxTurns, stepDelayMs,
     };
 
-    const r = await simFetch("/sim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const r = await simFetch("/sim", { method: "POST", body: JSON.stringify(body) });
     if (!r.ok) {
       const errEl = root.querySelector<HTMLElement>("#sim-err");
       if (errEl) errEl.textContent = `Failed to create simulation: ${r.status}`;
@@ -425,6 +444,10 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
         </div>
         <div class="sim-body">
           <div class="sim-map-area" id="sim-map-area"></div>
+          <div class="sim-log-panel" id="sim-log-panel">
+            <div class="sim-log-header">Log</div>
+            <div class="sim-log-entries" id="sim-log-entries"></div>
+          </div>
           <div class="sim-graph-panel">
             <div class="sim-graph-header">
               <span>Metrics</span>
@@ -443,12 +466,12 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     });
     root.querySelector("#btn-slow")!.addEventListener("click", () => {
       if (!simId) return;
-      void simFetch(`/sim/${simId}/resume`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ speed: "slow" }) });
+      void simFetch(`/sim/${simId}/resume`, { method: "POST", body: JSON.stringify({ speed: "slow" }) });
       setActiveSpeedBtn("slow");
     });
     root.querySelector("#btn-fast")!.addEventListener("click", () => {
       if (!simId) return;
-      void simFetch(`/sim/${simId}/resume`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ speed: "fast" }) });
+      void simFetch(`/sim/${simId}/resume`, { method: "POST", body: JSON.stringify({ speed: "fast" }) });
       setActiveSpeedBtn("fast");
     });
     root.querySelector("#btn-step")!.addEventListener("click", () => {
@@ -465,7 +488,7 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     root.querySelector<HTMLSelectElement>("#view-as-select")!.addEventListener("change", (e) => {
       const val = (e.target as HTMLSelectElement).value;
       if (currentStatus?.spectatorToken && currentStatus.matchId) {
-        connectSpectator(currentStatus.matchId, currentStatus.spectatorToken, val);
+        connectSpectator(currentStatus.matchId, currentStatus.spectatorToken, val, currentStatus.gameServerUrl ?? undefined);
       }
     });
     root.querySelector("#add-graph-btn")!.addEventListener("click", () => {
@@ -584,20 +607,29 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
 
   let cumulativeReward = 0;
 
-  function connectSpectator(matchId: string, token: string, asPlayer = ""): void {
-    // When switching views, flush the cached terrain so the new visibility state renders.
+  function connectSpectator(matchId: string, token: string, asPlayer = "", serverUrl?: string): void {
     if (mapViewer) mapViewer.clearLayerCaches();
     gameClient?.close();
-    gameClient = new GameClient(matchId, "", token, {
-      onOpen: () => { /* connected */ },
-      onClose: () => { /* disconnected */ },
-      onState: (state) => {
-        latestMatchState = state;
-        updateViewSelector(state);
-        scheduleRender();
-      },
-    }, asPlayer || undefined);
-    gameClient.connect();
+    let retries = 0;
+    const tryConnect = (): void => {
+      gameClient = new GameClient(matchId, "", token, {
+        onOpen: () => { retries = 0; },
+        onClose: () => {
+          // Reconnect while this matchId is still active (episode still in progress).
+          if (retries < 5 && currentStatus?.matchId === matchId) {
+            retries++;
+            setTimeout(tryConnect, 1000 * retries);
+          }
+        },
+        onState: (state) => {
+          latestMatchState = state;
+          updateViewSelector(state);
+          scheduleRender();
+        },
+      }, asPlayer || undefined, serverUrl);
+      gameClient.connect();
+    };
+    tryConnect();
   }
 
   // ── SSE connection ─────────────────────────────────────────────────────────
@@ -615,10 +647,22 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
         if (changed) {
           latestMatchState = null;
           mapViewer?.clearLayerCaches();
-          connectSpectator(data.matchId, data.spectatorToken);
+          connectSpectator(data.matchId, data.spectatorToken, "", data.gameServerUrl ?? undefined);
           graphPanel?.clear();
         }
       }
+    });
+
+    sseSource.addEventListener("log", (e) => {
+      const { message, ts } = JSON.parse(e.data) as { message: string; ts: string };
+      const logEntries = root.querySelector<HTMLElement>("#sim-log-entries");
+      if (!logEntries) return;
+      const time = new Date(ts).toLocaleTimeString();
+      const line = document.createElement("div");
+      line.className = `sim-log-line${message.startsWith("ERROR") ? " sim-log-error" : ""}`;
+      line.textContent = `${time}  ${message}`;
+      logEntries.appendChild(line);
+      logEntries.scrollTop = logEntries.scrollHeight;
     });
 
     sseSource.addEventListener("snapshot", (e) => {
@@ -637,8 +681,15 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
       if (rewardEl) rewardEl.textContent = cumulativeReward.toFixed(1);
     });
 
-    sseSource.addEventListener("done", () => {
+    sseSource.addEventListener("done", (e: MessageEvent) => {
       sseSource?.close();
+      // PyTorch path: per-episode records arrive in the done payload (no episode events during training)
+      if (episodeLog.length === 0 && e.data) {
+        try {
+          const payload = JSON.parse(e.data) as { summary?: EpRecord[] };
+          if (payload.summary?.length) episodeLog = [...payload.summary] as EpRecord[];
+        } catch { /**/ }
+      }
       renderResults();
     });
   }

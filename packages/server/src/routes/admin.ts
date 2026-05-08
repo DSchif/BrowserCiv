@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { allMatches, deleteMatch } from "../match-store.js";
 import { listUsers, setUserAdmin } from "../account-store.js";
+import { deleteMatchPersisted } from "../persistence.js";
 
 async function requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   try {
@@ -47,6 +48,7 @@ export async function registerAdminRoutes(app: FastifyInstance): Promise<void> {
     { onRequest: [requireAdmin] },
     async (req, reply) => {
       deleteMatch(req.params.id);
+      await deleteMatchPersisted(req.params.id);
       return { ok: true };
     },
   );

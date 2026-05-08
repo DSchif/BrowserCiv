@@ -8,6 +8,15 @@ export interface AuthSession {
 const TOKEN_KEY = "browserciv_token";
 const USERNAME_KEY = "browserciv_username";
 
+function sessionFromToken(token: string, username: string): AuthSession {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]!)) as { isAdmin?: boolean };
+    return { token, username, isGuest: false, isAdmin: payload.isAdmin === true };
+  } catch {
+    return { token, username, isGuest: false };
+  }
+}
+
 export function loadSession(): AuthSession | null {
   const token = localStorage.getItem(TOKEN_KEY);
   const username = localStorage.getItem(USERNAME_KEY);
@@ -106,7 +115,7 @@ export function renderAuth(
         return;
       }
       saveSession(data.token!, data.username!);
-      onAuth({ token: data.token!, username: data.username!, isGuest: false });
+      onAuth(sessionFromToken(data.token!, data.username!));
     } catch {
       err.textContent = "Network error — is the server running?";
     }
@@ -134,7 +143,7 @@ export function renderAuth(
         return;
       }
       saveSession(data.token!, data.username!);
-      onAuth({ token: data.token!, username: data.username!, isGuest: false });
+      onAuth(sessionFromToken(data.token!, data.username!));
     } catch {
       err.textContent = "Network error — is the server running?";
     }

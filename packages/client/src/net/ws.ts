@@ -27,12 +27,22 @@ export class GameClient {
     private token: string,
     events: ClientNetEvents,
     private viewAs?: string,
+    private serverUrl?: string,
   ) {
     this.events = events;
   }
 
   connect(): void {
-    const ws = new WebSocket(wsUrl(this.token, this.viewAs));
+    const url = this.serverUrl
+      ? (() => {
+          const u = new URL(this.serverUrl);
+          const proto = u.protocol === "https:" ? "wss:" : "ws:";
+          let s = `${proto}//${u.host}/ws?token=${encodeURIComponent(this.token)}`;
+          if (this.viewAs) s += `&viewAs=${encodeURIComponent(this.viewAs)}`;
+          return s;
+        })()
+      : wsUrl(this.token, this.viewAs);
+    const ws = new WebSocket(url);
     this.ws = ws;
     ws.addEventListener("open", () => {
       this.events.onOpen?.();

@@ -31,6 +31,9 @@ export class MatchRuntime {
   private spectators = new Set<{ ws: WsLike; viewAs?: string }>();
   private stateListeners = new Set<(rt: MatchRuntime) => void>();
 
+  /** Account username of the player who created the match (server-side only). */
+  createdByAccount?: string;
+
   constructor(
     public state: MatchState,
     public readonly content: ContentPack,
@@ -190,6 +193,7 @@ export class MatchRuntime {
       status: this.state.status,
       hostId: this.state.hostId,
       hostName: host?.name ?? "(unknown)",
+      ...(this.createdByAccount ? { createdByAccount: this.createdByAccount } : {}),
       playerCount: this.state.players.length,
       maxPlayers: 8,
       turnNumber: this.state.turnNumber,
@@ -253,10 +257,10 @@ export class MatchRuntime {
    */
   broadcastSnapshot(): void {
     for (const conn of this.conns) {
-      this.sendSnapshot(conn.ws, conn.playerId);
+      try { this.sendSnapshot(conn.ws, conn.playerId); } catch { /* stale connection */ }
     }
     for (const entry of this.spectators) {
-      this.sendToSpectator(entry);
+      try { this.sendToSpectator(entry); } catch { /* stale spectator */ }
     }
   }
 

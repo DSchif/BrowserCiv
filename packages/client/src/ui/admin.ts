@@ -9,6 +9,7 @@ interface AdminMatch {
   id: string;
   status: string;
   hostName: string;
+  createdByAccount?: string;
   playerCount: number;
   maxPlayers: number;
   mapSize: string;
@@ -21,9 +22,14 @@ function authHeader(): Record<string, string> {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const hasBody = init?.body != null;
   const res = await fetch(path, {
     ...init,
-    headers: { "Content-Type": "application/json", ...authHeader(), ...(init?.headers ?? {}) },
+    headers: {
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
+      ...authHeader(),
+      ...(init?.headers ?? {}),
+    },
   });
   if (!res.ok) throw new Error(`${path} → ${res.status}`);
   return res.json() as Promise<T>;
@@ -81,7 +87,7 @@ export function renderAdmin(root: HTMLElement, onBack: () => void): void {
       panel.innerHTML = `
         <table class="admin-table">
           <thead><tr>
-            <th>ID</th><th>Status</th><th>Host</th><th>Players</th><th>Map</th><th>Created</th><th></th>
+            <th>ID</th><th>Status</th><th>Host</th><th>Account</th><th>Players</th><th>Map</th><th>Created</th><th></th>
           </tr></thead>
           <tbody>
             ${matches.map((m) => `
@@ -89,6 +95,7 @@ export function renderAdmin(root: HTMLElement, onBack: () => void): void {
                 <td><code>${m.id}</code></td>
                 <td><span class="admin-status-${m.status}">${m.status}</span></td>
                 <td>${escapeHtml(m.hostName)}</td>
+                <td class="dim">${m.createdByAccount ? escapeHtml(m.createdByAccount) : "—"}</td>
                 <td>${m.playerCount}/${m.maxPlayers}</td>
                 <td>${m.mapSize}</td>
                 <td class="dim">${new Date(m.createdAt).toLocaleString()}</td>

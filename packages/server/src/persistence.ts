@@ -9,6 +9,7 @@ import {
   loadTokensDdb,
   persistMatchDdb,
   persistTokensDdb,
+  deleteMatchDdb,
 } from "./persistence-ddb.js";
 
 const DATA_DIR = process.env.BROWSERCIV_DATA_DIR ?? path.resolve("data");
@@ -118,5 +119,13 @@ export async function deleteMatchFile(matchId: string): Promise<void> {
     await fs.unlink(path.join(MATCHES_DIR, `${matchId}.json`));
   } catch {
     /* ignore */
+  }
+}
+
+export async function deleteMatchPersisted(matchId: string): Promise<void> {
+  if (isDdbEnabled()) {
+    await deleteMatchDdb(matchId);
+  } else {
+    await deleteMatchFile(matchId);
   }
 }

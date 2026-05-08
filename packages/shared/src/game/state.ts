@@ -161,6 +161,8 @@ export interface MatchSummary {
   status: MatchStatus;
   hostId: string;
   hostName: string;
+  /** Account username of the player who created the match. */
+  createdByAccount?: string;
   playerCount: number;
   maxPlayers: number;
   turnNumber: number;

@@ -97,6 +97,7 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       maxPlayers: body.maxPlayers,
       createdAt: new Date().toISOString(),
     });
+    rt.createdByAccount = request.user.username;
     putMatch(rt);
 
     const cred = issueToken(playerId, matchId);

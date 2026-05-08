@@ -81,7 +81,7 @@ export function renderLobby(
       .map(
         (m) => `
         <li>
-          <code>${m.id}</code> — host <strong>${escapeHtml(m.hostName)}</strong> —
+          <code>${m.id}</code> — host <strong>${escapeHtml(m.hostName)}</strong>${m.createdByAccount ? ` <span class="dim">(${escapeHtml(m.createdByAccount)})</span>` : ""} —
           ${m.playerCount}/${m.maxPlayers} players
           <button data-id="${m.id}" class="join">Join</button>
         </li>`,

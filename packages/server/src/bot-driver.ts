@@ -192,30 +192,42 @@ export class BotDriver {
 
   private driveUntilDone(brain: Brain): void {
     // Keep applying intents until EndTurn or brain returns null.
-    for (let i = 0; i < 200; i++) {
-      const s = this.rt.state;
-      if (s.status !== "in_progress") break;
-      if (s.players[s.currentPlayerIndex]?.id !== this.playerId) break;
+    // try-finally guarantees broadcastSnapshot is always called so the agent
+    // is never left waiting for a snapshot that will never arrive.
+    try {
+      for (let i = 0; i < 200; i++) {
+        const s = this.rt.state;
+        if (s.status !== "in_progress") break;
+        if (s.players[s.currentPlayerIndex]?.id !== this.playerId) break;
 
-      const view = buildView(s, this.playerId, this.rt.content);
-      const intent = brain(view, this.playerId, this.rt.content);
-      if (!intent) break;
+        const view = buildView(s, this.playerId, this.rt.content);
+        const intent = brain(view, this.playerId, this.rt.content);
+        if (!intent) break;
 
-      try {
-        this.rt.applyIntent(this.playerId, intent);
-      } catch (err) {
-        console.error(`[bot:${this.playerId}] intent rejected (${intent.type}):`, err instanceof Error ? err.message : err);
-        // Force end-turn to avoid getting stuck.
         try {
-          this.rt.applyIntent(this.playerId, { type: "EndTurn", actorId: this.playerId });
-        } catch { /* ignore */ }
-        break;
-      }
+          this.rt.applyIntent(this.playerId, intent);
+        } catch (err) {
+          console.error(`[bot:${this.playerId}] intent rejected (${intent.type}):`, err instanceof Error ? err.message : err);
+          // Force end-turn to avoid getting stuck.
+          try {
+            this.rt.applyIntent(this.playerId, { type: "EndTurn", actorId: this.playerId });
+          } catch { /* ignore */ }
+          break;
+        }
 
-      if (intent.type === "EndTurn") break;
+        if (intent.type === "EndTurn") break;
+      }
+    } catch (err) {
+      // Log but don't rethrow — broadcastSnapshot below must always run so
+      // the agent player isn't left waiting for a snapshot that never arrives.
+      console.error(`[bot:${this.playerId}] driveUntilDone threw:`, err instanceof Error ? err.message : err);
     }
     // Single broadcast after the entire turn, not after each intent.
-    this.rt.broadcastSnapshot();
+    try {
+      this.rt.broadcastSnapshot();
+    } catch (err) {
+      console.error(`[bot:${this.playerId}] broadcastSnapshot threw:`, err instanceof Error ? err.message : err);
+    }
   }
 
   destroy(): void {

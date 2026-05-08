@@ -142,4 +142,12 @@ jobs:
 
       - name: CDK deploy
         working-directory: packages/infra
-        run: pnpm exec cdk deploy BrowserCivStack --require-approval never
+        run: pnpm exec cdk deploy BrowserCivStack --require-approval never --outputs-file /tmp/cdk-outputs.json
+
+      - name: Package and upload agent-py to S3
+        run: |
+          MODEL_BUCKET=$(jq -r '.BrowserCivStack.ModelBucketName' /tmp/cdk-outputs.json)
+          cd packages/agent-py
+          zip -r /tmp/agent-py.zip . -x "*.pyc" -x "__pycache__/*"
+          aws s3 cp /tmp/agent-py.zip "s3://${MODEL_BUCKET}/agent-py.zip"
+          echo "Uploaded agent-py.zip to s3://${MODEL_BUCKET}/agent-py.zip"

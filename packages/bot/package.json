@@ -18,6 +18,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-ec2": "^3.715.0",
+    "@aws-sdk/client-s3": "^3.715.0",
     "@browserciv/shared": "workspace:*",
     "ws": "^8.18.0"
   },
