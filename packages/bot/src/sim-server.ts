@@ -630,14 +630,16 @@ class SimSession {
               latestSpecState = msg.state as MatchView;
               if (specPlayerId) {
                 const snap = snapTurn(latestSpecState, specPlayerId, currentKills, currentCaptures);
-                this.currentTurn = snap.turn;
+                this.currentTurn = snap.turn;  // game turnNumber — the only authoritative source
                 this.emit("snapshot", { episode: this.currentEpisode, turn: snap.turn, snap });
               }
             }
           } catch { /**/ }
         });
         ws.on("close", () => {
-          if (specMatchId === matchId && !this.aborted) {
+          // Don't reconnect to a match that already finished — wait for S3 to supply a new matchId.
+          const matchFinished = latestSpecState?.status === "finished";
+          if (specMatchId === matchId && !this.aborted && !matchFinished) {
             this.log(`[spec] WS closed for ep ${this.currentEpisode} — reconnecting in 3s`);
             setTimeout(doConnect, 3000);
           }
@@ -652,14 +654,14 @@ class SimSession {
 
     // Poll S3 live.json until done or aborted
     while (!this.aborted) {
-      await new Promise<void>((r) => setTimeout(r, 3000));
+      await new Promise<void>((r) => setTimeout(r, 1500));
       const live = await getPyTorchLiveState(bucket, handle.liveKey);
 
       if (!live) {
         pollsWithoutData++;
-        if (pollsWithoutData === 5)  this.log("Instance booting — downloading agent-py.zip from S3 …");
-        if (pollsWithoutData === 15) this.log("Installing Python dependencies (torch, aiohttp) …");
-        if (pollsWithoutData === 25) this.log("Still waiting — instance may be initialising or pip install is running …");
+        if (pollsWithoutData === 10) this.log("Instance booting — downloading agent-py.zip from S3 …");
+        if (pollsWithoutData === 30) this.log("Installing Python dependencies (torch, aiohttp) …");
+        if (pollsWithoutData === 50) this.log("Still waiting — instance may be initialising or pip install is running …");
         continue;
       }
 
@@ -669,6 +671,7 @@ class SimSession {
       if (live.episode !== lastEpisode) {
         this.log(`Episode ${live.episode + 1}/${live.totalEpisodes} started — match ${live.matchId ?? "?"}`);
         lastEpisode = live.episode;
+        this.currentTurn = 0;  // reset on episode boundary
         if (live.matchId && live.spectatorToken && live.agentPlayerId) {
           connectSpec(live.matchId, live.spectatorToken, live.agentPlayerId);
         }
@@ -677,7 +680,8 @@ class SimSession {
       currentKills    = live.cumKills ?? 0;
       currentCaptures = live.cumCaptures ?? 0;
       this.currentEpisode = live.episode;
-      this.currentTurn    = live.turn;
+      // Do NOT use live.turn here — that's Python's step() call count (actions), not game turns.
+      // currentTurn is maintained exclusively by the spectator WS using view.turnNumber.
       this.matchId        = live.matchId;
       this.spectatorToken = live.spectatorToken;
       if (live.agentPlayerId) this.agentPlayerId = live.agentPlayerId;

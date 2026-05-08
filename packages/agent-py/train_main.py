@@ -226,7 +226,7 @@ async def async_main():
         def on_turn(turn: int, reward: float, kills: int = 0):
             nonlocal cumulative_reward
             cumulative_reward = reward
-            if args.s3_bucket and args.live_key and turn % 5 == 0:
+            if args.s3_bucket and args.live_key and turn % 2 == 0:
                 # Write every 5 turns to stay responsive without hammering S3
                 try:
                     s3_put_json(args.s3_bucket, args.live_key, {
