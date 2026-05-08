@@ -149,6 +149,15 @@ function buildUserData(cfg: PyTorchLaunchConfig & { liveKey: string; modelKey: s
   return `#!/bin/bash
 set -euo pipefail
 
+# Always self-terminate on exit — even if Python crashes or set -e fires early.
+_self_terminate() {
+  local ID REGION
+  ID=$(curl -sf http://169.254.169.254/latest/meta-data/instance-id) || return
+  REGION=$(curl -sf http://169.254.169.254/latest/meta-data/placement/region) || return
+  aws ec2 terminate-instances --region "$REGION" --instance-ids "$ID" || true
+}
+trap _self_terminate EXIT
+
 # Pre-baked AMI already has python3.11 + torch2.2+cpu + deps installed.
 # Just pull the latest agent code and run.
 aws s3 cp s3://${cfg.s3Bucket}/agent-py.zip /tmp/agent-py.zip
@@ -167,11 +176,6 @@ ${cfg.hiddenLayers  ? `export HIDDEN="${cfg.hiddenLayers}"` : ""}
 ${cfg.learningRate  ? `export LR="${cfg.learningRate}"` : ""}
 ${cfg.stepDelayMs  ? `export STEP_DELAY="${(cfg.stepDelayMs / 1000).toFixed(3)}"` : ""}
 
-python3.11 train_main.py
-
-# Self-terminate once done
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
-aws ec2 terminate-instances --region "$REGION" --instance-ids "$INSTANCE_ID"
+python3.11 train_main.py || true
 `;
 }

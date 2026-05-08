@@ -31,6 +31,7 @@ class GameEnv:
         self._prev_techs = 0
         self._prev_units = 0
         self._kills = 0
+        self._prev_enemy_ids: set[str] = set()
         self._client_seq = 0
 
     async def connect(self):
@@ -46,6 +47,7 @@ class GameEnv:
         self._prev_techs = len(player.get("researchedTechs", []))
         self._prev_units = len([u for u in self._state["units"] if u["ownerId"] == self.viewer_id])
         self._kills = 0
+        self._prev_enemy_ids = {u["id"] for u in self._state["units"] if u["ownerId"] != self.viewer_id}
         return encode_state(self._state)
 
     async def step(self, action: int) -> tuple[np.ndarray, np.ndarray, float, bool, dict]:
@@ -77,12 +79,17 @@ class GameEnv:
                 new_cities = len([c for c in self._state["cities"] if c["ownerId"] == self.viewer_id])
                 new_techs = len(player.get("researchedTechs", []))
                 new_units = len([u for u in self._state["units"] if u["ownerId"] == self.viewer_id])
+                new_enemy_ids = {u["id"] for u in self._state["units"] if u["ownerId"] != self.viewer_id}
+                kills_this_step = len(self._prev_enemy_ids - new_enemy_ids)
                 reward += REWARD_CITY * (new_cities - self._prev_cities)
                 reward += REWARD_TECH * (new_techs - self._prev_techs)
                 reward += REWARD_UNIT * max(0, new_units - self._prev_units)
+                reward += REWARD_KILL * kills_this_step
+                self._kills += kills_this_step
                 self._prev_cities = new_cities
                 self._prev_techs = new_techs
                 self._prev_units = new_units
+                self._prev_enemy_ids = new_enemy_ids
 
                 # Game over: status == "finished"
                 if self._state.get("status") == "finished":
@@ -121,7 +128,10 @@ class GameEnv:
 
     async def close(self):
         if self._ws:
-            await self._ws.close()
+            try:
+                await asyncio.wait_for(self._ws.close(), timeout=5.0)
+            except Exception:
+                pass
             self._ws = None
 
     # ------------------------------------------------------------------

@@ -88,8 +88,11 @@ def save_ckpt(model: ActorCritic, optimizer: torch.optim.Optimizer, episode: int
 # Match setup via game server
 # ---------------------------------------------------------------------------
 
+_HTTP_TIMEOUT = aiohttp.ClientTimeout(total=30)
+
+
 async def train_setup(http_url: str, map_size: str, strategy: str) -> dict:
-    async with aiohttp.ClientSession() as sess:
+    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as sess:
         async with sess.post(
             f"{http_url}/train-setup",
             json={"mapSize": map_size, "strategy": strategy},
@@ -99,7 +102,7 @@ async def train_setup(http_url: str, map_size: str, strategy: str) -> dict:
 
 
 async def train_start(http_url: str, match_id: str, agent_token: str, opponent_id: str, strategy: str):
-    async with aiohttp.ClientSession() as sess:
+    async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as sess:
         async with sess.post(
             f"{http_url}/train-start",
             json={
