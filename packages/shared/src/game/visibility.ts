@@ -1,5 +1,5 @@
 import type { AxialCoord } from "../hex.js";
-import { distance, key as hexKey } from "../hex.js";
+import { diskCoords, key as hexKey } from "../hex.js";
 import { cityFootprint } from "./city.js";
 import type { GameMap, MatchState, Unit } from "./state.js";
 
@@ -11,12 +11,19 @@ export function currentlyVisibleFor(state: MatchState, playerId: string): Set<st
   const visible = new Set<string>();
   if (!state.map) return visible;
 
+  // Index valid tile positions once — O(tiles) — then disk lookups are O(radius²) per unit.
+  const tileSet = new Set(state.map.tiles.map((t) => hexKey({ q: t.q, r: t.r })));
+
+  const addDisk = (center: AxialCoord, radius: number) => {
+    for (const coord of diskCoords(center, radius)) {
+      const k = hexKey(coord);
+      if (tileSet.has(k)) visible.add(k);
+    }
+  };
+
   for (const u of state.units) {
     if (u.ownerId !== playerId) continue;
-    for (const tile of state.map.tiles) {
-      if (distance(u.position, { q: tile.q, r: tile.r }) <= UNIT_SIGHT)
-        visible.add(hexKey({ q: tile.q, r: tile.r }));
-    }
+    addDisk(u.position, UNIT_SIGHT);
   }
   for (const c of state.cities) {
     if (c.ownerId !== playerId) continue;
@@ -24,12 +31,8 @@ export function currentlyVisibleFor(state: MatchState, playerId: string): Set<st
   }
   // Pre-game / pre-unit safety: starting hex disk is always visible.
   const me = state.players.find((p) => p.id === playerId);
-  if (me?.startingHex) {
-    for (const tile of state.map.tiles) {
-      if (distance(me.startingHex, { q: tile.q, r: tile.r }) <= UNIT_SIGHT)
-        visible.add(hexKey({ q: tile.q, r: tile.r }));
-    }
-  }
+  if (me?.startingHex) addDisk(me.startingHex, UNIT_SIGHT);
+
   return visible;
 }
 
@@ -63,10 +66,6 @@ export function unitsVisibleIn(units: Unit[], tiles: Set<string>): Unit[] {
 
 /** Convenience: hex disk centered on `c` of radius `r` (clipped to map). */
 export function hexDisk(map: GameMap, c: AxialCoord, r: number): string[] {
-  const out: string[] = [];
-  for (const tile of map.tiles) {
-    if (distance(c, { q: tile.q, r: tile.r }) <= r)
-      out.push(hexKey({ q: tile.q, r: tile.r }));
-  }
-  return out;
+  const tileSet = new Set(map.tiles.map((t) => hexKey({ q: t.q, r: t.r })));
+  return diskCoords(c, r).map((coord) => hexKey(coord)).filter((k) => tileSet.has(k));
 }

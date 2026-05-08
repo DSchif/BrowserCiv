@@ -422,7 +422,7 @@ class SimSession {
         matchId: setup.matchId,
         content: this.content,
         verbose: false,
-        stallTimeoutMs: 5 * 60 * 1000,
+        stallTimeoutMs: 45_000,
         stepController: stepCtrl,
         maxTurns: this.cfg.maxTurns,
       } as const;

@@ -1,5 +1,5 @@
 import type { AxialCoord } from "../hex.js";
-import { distance, key as hexKey, neighbors } from "../hex.js";
+import { diskCoords, distance, key as hexKey, neighbors } from "../hex.js";
 import type { ContentPack, Yields } from "../schemas/index.js";
 import type {
   City,
@@ -34,12 +34,10 @@ const ZERO_YIELDS: Yields = {};
 
 /** Hexes within `CITY_RADIUS` of `center` that are on the map. */
 export function cityFootprint(map: GameMap, center: AxialCoord): string[] {
-  const out: string[] = [];
-  for (const tile of map.tiles) {
-    if (distance(center, { q: tile.q, r: tile.r }) <= CITY_RADIUS)
-      out.push(hexKey({ q: tile.q, r: tile.r }));
-  }
-  return out;
+  const tileSet = new Set(map.tiles.map((t) => hexKey({ q: t.q, r: t.r })));
+  return diskCoords(center, CITY_RADIUS)
+    .map((c) => hexKey(c))
+    .filter((k) => tileSet.has(k));
 }
 
 /** Tiles workable by `city` (its owned set minus the center). */
@@ -451,24 +449,23 @@ export function playerVisibleHexes(state: MatchState, playerId: string): Set<str
   const out = new Set<string>();
   if (!state.map) return out;
   const SIGHT = 2;
+  const tileSet = new Set(state.map.tiles.map((t) => hexKey({ q: t.q, r: t.r })));
+  const addDisk = (center: AxialCoord, radius: number) => {
+    for (const coord of diskCoords(center, radius)) {
+      const k = hexKey(coord);
+      if (tileSet.has(k)) out.add(k);
+    }
+  };
   for (const u of state.units) {
     if (u.ownerId !== playerId) continue;
-    for (const tile of state.map.tiles) {
-      if (distance(u.position, { q: tile.q, r: tile.r }) <= SIGHT)
-        out.add(hexKey({ q: tile.q, r: tile.r }));
-    }
+    addDisk(u.position, SIGHT);
   }
   for (const c of state.cities) {
     if (c.ownerId !== playerId) continue;
     for (const k of cityFootprint(state.map, c.position)) out.add(k);
   }
   const me = state.players.find((p) => p.id === playerId);
-  if (me?.startingHex) {
-    for (const tile of state.map.tiles) {
-      if (distance(me.startingHex, { q: tile.q, r: tile.r }) <= SIGHT)
-        out.add(hexKey({ q: tile.q, r: tile.r }));
-    }
-  }
+  if (me?.startingHex) addDisk(me.startingHex, SIGHT);
   return out;
 }
 

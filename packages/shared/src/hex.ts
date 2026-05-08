@@ -57,3 +57,19 @@ export function axialToPixel(a: AxialCoord, size: number): { x: number; y: numbe
   const y = size * ((3 / 2) * a.r);
   return { x, y };
 }
+
+/**
+ * Enumerate all axial coordinates within `radius` hexes of `center`.
+ * Iterates the ring offsets directly — O(radius²) rather than O(all_map_tiles).
+ */
+export function diskCoords(center: AxialCoord, radius: number): AxialCoord[] {
+  const out: AxialCoord[] = [];
+  for (let dq = -radius; dq <= radius; dq++) {
+    const rMin = Math.max(-radius, -dq - radius);
+    const rMax = Math.min(radius, -dq + radius);
+    for (let dr = rMin; dr <= rMax; dr++) {
+      out.push({ q: center.q + dq, r: center.r + dr });
+    }
+  }
+  return out;
+}
