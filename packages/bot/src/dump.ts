@@ -23,6 +23,8 @@ export interface TurnSnap {
   totalTiles: number;
   cumKills: number;
   cumCaptures: number;
+  cumReward?: number;
+  turnDurationMs?: number;
   agent: PlayerSnap;
   opponent: PlayerSnap | null;
 }

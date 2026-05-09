@@ -649,8 +649,9 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     });
 
     // Default graphs
+    graphPanel.addGraph({ id: "g-reward", title: "Reward", metrics: ["reward"] });
+    graphPanel.addGraph({ id: "g-turn-time", title: "Turn Duration (ms)", metrics: ["turnDurationMs"] });
     graphPanel.addGraph({ id: "g-cities", title: "Cities", metrics: ["agent.cities", "opp.cities"] });
-    graphPanel.addGraph({ id: "g-units", title: "Units", metrics: ["agent.units", "opp.units"] });
     graphPanel.addGraph({ id: "g-kills", title: "Kills & Captures", metrics: ["cumKills", "cumCaptures"] });
 
     // Init map
@@ -790,6 +791,8 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
           mapViewer?.clearLayerCaches();
           connectSpectator(data.matchId, data.spectatorToken, "", data.gameServerUrl ?? undefined);
           graphPanel?.clear();
+          const rewardEl = root.querySelector("#reward-label span");
+          if (rewardEl) rewardEl.textContent = "0.0";
         }
       }
     });
@@ -810,8 +813,14 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
       const data = JSON.parse(e.data) as { turn: number; snap?: TurnSnap };
       const turnLabel = root.querySelector("#turn-label");
       if (turnLabel) turnLabel.textContent = `Turn ${data.turn}/${currentStatus?.maxTurns ?? "—"}`;
-      // Push graph data from agent's snap (server-computed); spectator WS is for map only
-      if (data.snap && graphPanel) graphPanel.push(data.snap);
+      if (data.snap) {
+        if (graphPanel) graphPanel.push(data.snap);
+        // Update topbar reward live from snap
+        if (data.snap.cumReward != null) {
+          const rewardEl = root.querySelector("#reward-label span");
+          if (rewardEl) rewardEl.textContent = data.snap.cumReward.toFixed(1);
+        }
+      }
     });
 
     sseSource.addEventListener("episode", (e) => {

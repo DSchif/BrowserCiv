@@ -1,7 +1,7 @@
 import { Chart, registerables } from "chart.js";
 
 interface PlayerSnap { id: string; cities: number; units: number; unitsByType: Record<string, number>; gold: number; goldPerTurn: number; sciencePerTurn: number; productionPerTurn: number; foodPerTurn: number; techs: number; currentTech: string | null; totalBuildings: number; totalPopulation: number; tilesOwned: number; }
-export interface TurnSnap { turn: number; seenTiles: number; totalTiles: number; cumKills: number; cumCaptures: number; agent: PlayerSnap; opponent: PlayerSnap | null; }
+export interface TurnSnap { turn: number; seenTiles: number; totalTiles: number; cumKills: number; cumCaptures: number; cumReward?: number; turnDurationMs?: number; agent: PlayerSnap; opponent: PlayerSnap | null; }
 
 Chart.register(...registerables);
 
@@ -11,9 +11,12 @@ export type MetricKey =
   | "agent.totalBuildings" | "agent.totalPopulation" | "agent.tilesOwned"
   | "opp.cities" | "opp.units" | "opp.goldPerTurn" | "opp.sciencePerTurn"
   | "opp.techs" | "opp.totalPopulation" | "opp.totalBuildings"
-  | "cumKills" | "cumCaptures" | "seenPct";
+  | "cumKills" | "cumCaptures" | "seenPct"
+  | "reward" | "turnDurationMs";
 
 export const METRIC_LABELS: Record<MetricKey, string> = {
+  "reward": "Episode Reward",
+  "turnDurationMs": "Turn Duration (ms)",
   "agent.cities": "Agent Cities",
   "agent.units": "Agent Units",
   "agent.goldPerTurn": "Agent Gold/Turn",
@@ -41,13 +44,16 @@ export const METRIC_GROUPS: Array<{ label: string; keys: MetricKey[] }> = [
   { label: "Opponent", keys: ["opp.cities","opp.units","opp.goldPerTurn","opp.sciencePerTurn","opp.techs","opp.totalPopulation","opp.totalBuildings"] },
   { label: "Battle", keys: ["cumKills","cumCaptures"] },
   { label: "Exploration", keys: ["seenPct"] },
+  { label: "Training", keys: ["reward","turnDurationMs"] },
 ];
 
 const COLORS: Record<string, string> = {
-  "agent.": "rgba(100,180,255,0.9)",
-  "opp.":   "rgba(255,100,100,0.85)",
-  "cum":    "rgba(255,215,0,0.9)",
-  "seen":   "rgba(100,220,100,0.9)",
+  "agent.":        "rgba(100,180,255,0.9)",
+  "opp.":          "rgba(255,100,100,0.85)",
+  "cum":           "rgba(255,215,0,0.9)",
+  "seen":          "rgba(100,220,100,0.9)",
+  "reward":        "rgba(130,210,130,0.9)",
+  "turnDuration":  "rgba(255,165,80,0.9)",
 };
 
 function colorFor(key: MetricKey): string {
@@ -61,6 +67,8 @@ function extractValue(snap: TurnSnap, key: MetricKey): number {
   if (key === "seenPct") return snap.totalTiles > 0 ? snap.seenTiles / snap.totalTiles * 100 : 0;
   if (key === "cumKills") return snap.cumKills;
   if (key === "cumCaptures") return snap.cumCaptures;
+  if (key === "reward") return snap.cumReward ?? 0;
+  if (key === "turnDurationMs") return snap.turnDurationMs ?? 0;
   const [owner, field] = key.split(".");
   const player = owner === "agent" ? snap.agent : snap.opponent;
   if (!player) return 0;

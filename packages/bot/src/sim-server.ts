@@ -443,19 +443,27 @@ class SimSession {
         playerId: setup.agentToken.playerId,
         agent: this.agent,
         stepDelayMs: this.speedDelayMs,
-        onTurnSnap: (agentSnap: TurnSnap) => {
-          this.currentTurn = agentSnap.turn;
-          // Spectator view gives accurate full-visibility city/unit counts.
-          // Preserve seenTiles/totalTiles from the agent's fogged view for real exploration %.
-          const snap: TurnSnap = latestSpectatorView
-            ? {
-                ...snapTurn(latestSpectatorView, setup.agentToken.playerId, agentSnap.cumKills, agentSnap.cumCaptures),
-                seenTiles: agentSnap.seenTiles,
-                totalTiles: agentSnap.totalTiles,
-              }
-            : agentSnap;
-          this.emit("snapshot", { episode: ep, turn: snap.turn, snap });
-        },
+        onTurnSnap: (() => {
+          let lastSnapMs = Date.now();
+          return (agentSnap: TurnSnap, rewardSoFar: number) => {
+            this.currentTurn = agentSnap.turn;
+            const now = Date.now();
+            const durMs = now - lastSnapMs;
+            lastSnapMs = now;
+            // Spectator view gives accurate full-visibility city/unit counts.
+            // Preserve seenTiles/totalTiles from the agent's fogged view for real exploration %.
+            const snap: TurnSnap = latestSpectatorView
+              ? {
+                  ...snapTurn(latestSpectatorView, setup.agentToken.playerId, agentSnap.cumKills, agentSnap.cumCaptures),
+                  seenTiles: agentSnap.seenTiles,
+                  totalTiles: agentSnap.totalTiles,
+                }
+              : agentSnap;
+            snap.cumReward = rewardSoFar;
+            snap.turnDurationMs = agentSnap.turn > 1 ? durMs : 0;
+            this.emit("snapshot", { episode: ep, turn: snap.turn, snap });
+          };
+        })(),
       };
 
       let result: import("./train-runner.js").EpisodeResult;

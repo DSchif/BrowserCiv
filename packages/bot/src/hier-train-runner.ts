@@ -35,8 +35,8 @@ export async function runHierTrainingEpisode(opts: {
   stepController?: StepController;
   /** Delay (ms) at the start of each of our turns (0 = max speed) */
   stepDelayMs?: number;
-  /** Called once per unique turn with live metrics */
-  onTurnSnap?: (snap: TurnSnap) => void;
+  /** Called once per unique turn with live metrics and the running episode reward */
+  onTurnSnap?: (snap: TurnSnap, rewardSoFar: number) => void;
   /** End episode after this many turns (0 or undefined = no limit) */
   maxTurns?: number;
 }): Promise<EpisodeResult> {
@@ -161,7 +161,7 @@ export async function runHierTrainingEpisode(opts: {
           const isNewTurn = !turnDumps.has(state.turnNumber);
           const snap = snapTurn(state, playerId, totalKills, totalCitiesCaptured);
           turnDumps.set(state.turnNumber, snap);
-          if (isNewTurn && onTurnSnap) onTurnSnap(snap);
+          if (isNewTurn && onTurnSnap) onTurnSnap(snap, agentReward);
 
           if (pendingPrev && pendingIntent) {
             completeTransition(state.status === "finished" ? null : state);
@@ -185,9 +185,9 @@ export async function runHierTrainingEpisode(opts: {
                 await stepController.waitForResume();
               }
               const delay = stepController?.getDelayMs?.() ?? stepDelayMs;
-              if (delay > 0) {
-                await new Promise<void>((r) => setTimeout(r, delay));
-              }
+              // Always await — even setTimeout(fn, 0) yields a macrotask boundary so
+              // the game server's WS send buffer and SSE writes get to flush between turns.
+              await new Promise<void>((r) => setTimeout(r, delay));
             }
             if (settled) return;
 
