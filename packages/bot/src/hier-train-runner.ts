@@ -185,9 +185,14 @@ export async function runHierTrainingEpisode(opts: {
                 await stepController.waitForResume();
               }
               const delay = stepController?.getDelayMs?.() ?? stepDelayMs;
-              // Always await — even setTimeout(fn, 0) yields a macrotask boundary so
-              // the game server's WS send buffer and SSE writes get to flush between turns.
-              await new Promise<void>((r) => setTimeout(r, delay));
+              if (delay > 0) {
+                await new Promise<void>((r) => setTimeout(r, delay));
+              } else {
+                // setImmediate yields to the event loop's check phase (after I/O) so the
+                // game server's WS send buffer can drain before we send the next intent,
+                // with zero extra wait time compared to setTimeout(fn, 0)'s ~1-4ms minimum.
+                await new Promise<void>((r) => setImmediate(r));
+              }
             }
             if (settled) return;
 

@@ -143,6 +143,8 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
 
   let latestMatchState: unknown = null;
   let renderRafId: number | null = null;
+  let latestSnap: TurnSnap | null = null;
+  let snapRafId: number | null = null;
 
   // ── Active-sim table (setup page) ───────────────────────────────────────────
 
@@ -811,14 +813,24 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
 
     sseSource.addEventListener("snapshot", (e) => {
       const data = JSON.parse(e.data) as { turn: number; snap?: TurnSnap };
-      const turnLabel = root.querySelector("#turn-label");
-      if (turnLabel) turnLabel.textContent = `Turn ${data.turn}/${currentStatus?.maxTurns ?? "—"}`;
       if (data.snap) {
-        if (graphPanel) graphPanel.push(data.snap);
-        // Update topbar reward live from snap
-        if (data.snap.cumReward != null) {
-          const rewardEl = root.querySelector("#reward-label span");
-          if (rewardEl) rewardEl.textContent = data.snap.cumReward.toFixed(1);
+        // Overwrite — only the latest snap matters. If multiple arrive before the
+        // next animation frame the intermediate ones are dropped, which is fine.
+        latestSnap = data.snap;
+        if (snapRafId === null) {
+          snapRafId = requestAnimationFrame(() => {
+            snapRafId = null;
+            const snap = latestSnap;
+            latestSnap = null;
+            if (!snap) return;
+            const turnLabel = root.querySelector("#turn-label");
+            if (turnLabel) turnLabel.textContent = `Turn ${snap.turn}/${currentStatus?.maxTurns ?? "—"}`;
+            if (graphPanel) graphPanel.push(snap);
+            if (snap.cumReward != null) {
+              const rewardEl = root.querySelector("#reward-label span");
+              if (rewardEl) rewardEl.textContent = snap.cumReward.toFixed(1);
+            }
+          });
         }
       }
     });
@@ -1190,6 +1202,8 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     sseSource?.close(); sseSource = null;
     gameClient?.close(); gameClient = null;
     if (renderRafId !== null) { cancelAnimationFrame(renderRafId); renderRafId = null; }
+    if (snapRafId !== null) { cancelAnimationFrame(snapRafId); snapRafId = null; }
+    latestSnap = null;
     if (pixiApp) { try { pixiApp.destroy(); } catch { /**/ } pixiApp = null; }
     mapViewer = null;
     graphPanel = null;
