@@ -49,10 +49,10 @@ class GameEnv:
         self._prev_units = len([u for u in self._state["units"] if u["ownerId"] == self.viewer_id])
         self._kills = 0
         self._prev_enemy_ids = {u["id"] for u in self._state["units"] if u["ownerId"] != self.viewer_id}
-        return encode_state(self._state)
+        return self._encode_state(self._state)
 
     async def step(self, action: int) -> tuple[np.ndarray, np.ndarray, float, bool, dict]:
-        intent = decode_action(action, self._state, self.viewer_id)
+        intent = self._decode_action(action, self._state)
         if intent is None:
             intent = {"type": "EndTurn", "actorId": self.viewer_id}
 
@@ -120,10 +120,9 @@ class GameEnv:
 
         info["kills"] = self._kills
         if done:
-            obs = np.zeros(OBS_DIM, dtype=np.float32)
-            mask = np.zeros(ACT_DIM, dtype=np.float32)
+            obs, mask = self._zero_obs()
         else:
-            obs, mask = encode_state(self._state)
+            obs, mask = self._encode_state(self._state)
 
         return obs, mask, reward, done, info
 
@@ -134,6 +133,21 @@ class GameEnv:
             except Exception:
                 pass
             self._ws = None
+
+    # ------------------------------------------------------------------
+    # Subclass hooks — override to use a different encoder/decoder
+
+    def _encode_state(self, state: dict) -> tuple:
+        return encode_state(state)
+
+    def _decode_action(self, action: int, state: dict) -> dict | None:
+        return decode_action(action, state, self.viewer_id)
+
+    def _zero_obs(self) -> tuple:
+        return (
+            np.zeros(OBS_DIM, dtype=np.float32),
+            np.zeros(ACT_DIM, dtype=np.float32),
+        )
 
     # ------------------------------------------------------------------
     def _my_player(self) -> dict:

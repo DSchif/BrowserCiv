@@ -13,7 +13,7 @@
     "session": "tsx src/session.ts",
     "hier-session": "tsx src/hier-session.ts",
     "viz": "tsx src/viz.ts",
-    "sim-server": "tsx src/sim-server.ts",
+    "sim-server": "node --env-file-if-exists=.env --import tsx/esm src/sim-server.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },

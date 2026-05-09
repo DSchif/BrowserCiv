@@ -125,6 +125,22 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
   let pytorchRewards: Record<string, number> = Object.fromEntries(
     PYTORCH_REWARD_DEFS.map((d) => [d.key, d.default]),
   );
+
+  const OBS_CONFIG_FLAGS: Array<{ key: string; label: string; default: boolean }> = [
+    { key: "use_my_units",           label: "My units",                    default: true  },
+    { key: "use_unit_combat_stats",  label: "Unit combat stats",           default: true  },
+    { key: "use_unit_status",        label: "Unit status (fortified etc)", default: true  },
+    { key: "use_enemy_units",        label: "Enemy units",                 default: true  },
+    { key: "use_enemy_combat_stats", label: "Enemy combat stats",          default: true  },
+    { key: "use_my_cities",          label: "My cities",                   default: true  },
+    { key: "use_city_buildings",     label: "City buildings (27 feats)",   default: false },
+    { key: "use_tech_multihot",      label: "Tech multi-hot (74 bits)",    default: true  },
+    { key: "use_global_cnn",         label: "Map CNN (32×32 grid)",        default: false },
+  ];
+  let obsConfig: Record<string, boolean> = Object.fromEntries(
+    OBS_CONFIG_FLAGS.map((f) => [f.key, f.default]),
+  );
+
   let latestMatchState: unknown = null;
   let renderRafId: number | null = null;
 
@@ -146,12 +162,15 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
 
     const rows = sessions.map((s) => {
       const info = s.displayInfo;
+      const zipName = (key: string | null) => key ? key.replace(/^agents\//, "").replace(/\.zip$/, "") : null;
       const agentLabel = !info ? "—"
         : info.agentType === "pytorch"
-          ? `EC2 ${info.agentZipKey ? info.agentZipKey.replace(/^agents\//, "").replace(/\.zip$/, "") : "ppo"}`
-          : info.agentType === "hier"
-            ? `RL ${info.agentFile ? `(${info.agentFile})` : "(fresh)"}`
-            : info.agentType;
+          ? `EC2 ${zipName(info.agentZipKey) ?? "ppo"}`
+          : info.agentType === "hybrid"
+            ? `Hybrid ${zipName(info.agentZipKey) ?? "hybrid"}`
+            : info.agentType === "hier"
+              ? `RL ${info.agentFile ? `(${info.agentFile})` : "(fresh)"}`
+              : info.agentType;
       const oppLabel = !info ? "—"
         : info.opponentType === "hier"
           ? `RL ${info.opponentFile ? `(${info.opponentFile})` : "(fresh)"}`
@@ -248,7 +267,8 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
               <h3>Agent (Player 1)</h3>
               <label>Type
                 <select id="agent-type">
-                  <option value="pytorch">PyTorch (EC2 spot)</option>
+                  <option value="pytorch">PyTorch PPO (EC2 spot)</option>
+                  <option value="hybrid">Hybrid RL (EC2 spot)</option>
                   <option value="hier">Hierarchical RL (in-process)</option>
                   <option value="greedy">Greedy</option>
                   <option value="random">Random</option>
@@ -269,6 +289,35 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
                         <span class="goal-name">${d.label}</span>
                         <input type="number" class="goal-w pytorch-reward-input" data-key="${d.key}"
                                value="${pytorchRewards[d.key]}" step="0.1">
+                      </div>`).join("")}
+                  </div>
+                </div>
+              </div>
+              <div id="hybrid-opts" style="display:none">
+                <label>Agent package
+                  <select id="hybrid-s3-agent-key">
+                    ${s3AgentOptions}
+                  </select>
+                </label>
+                <div class="sim-goals">
+                  <div class="sim-goals-title" id="hybrid-rewards-toggle">▸ Reward Weights</div>
+                  <div id="hybrid-rewards-body" style="display:none">
+                    ${PYTORCH_REWARD_DEFS.map((d) => `
+                      <div class="sim-goal-row">
+                        <span class="goal-name">${d.label}</span>
+                        <input type="number" class="goal-w hybrid-reward-input" data-key="${d.key}"
+                               value="${pytorchRewards[d.key]}" step="0.1">
+                      </div>`).join("")}
+                  </div>
+                </div>
+                <div class="sim-goals">
+                  <div class="sim-goals-title" id="obs-config-toggle">▸ Observation Features</div>
+                  <div id="obs-config-body" style="display:none">
+                    ${OBS_CONFIG_FLAGS.map((f) => `
+                      <div class="sim-goal-row">
+                        <input type="checkbox" class="obs-flag-input" data-key="${f.key}"
+                               ${obsConfig[f.key] ? "checked" : ""}>
+                        <span class="goal-name">${f.label}</span>
                       </div>`).join("")}
                   </div>
                 </div>
@@ -375,10 +424,33 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
       root.querySelector("#agent-type")!.addEventListener("change", () => {
         const t = (root.querySelector<HTMLSelectElement>("#agent-type"))!.value;
         root.querySelector<HTMLElement>("#pytorch-opts")!.style.display = t === "pytorch" ? "" : "none";
+        root.querySelector<HTMLElement>("#hybrid-opts")!.style.display  = t === "hybrid"  ? "" : "none";
         root.querySelector<HTMLElement>("#hier-opts")!.style.display    = t === "hier"    ? "" : "none";
       });
       // Initialise visibility for default selection (pytorch)
       root.querySelector<HTMLElement>("#hier-opts")!.style.display = "none";
+
+      // Hybrid reward weights toggle
+      root.querySelector("#hybrid-rewards-toggle")!.addEventListener("click", () => {
+        const body = root.querySelector<HTMLElement>("#hybrid-rewards-body")!;
+        const visible = body.style.display !== "none";
+        body.style.display = visible ? "none" : "block";
+        root.querySelector("#hybrid-rewards-toggle")!.textContent = (visible ? "▸" : "▾") + " Reward Weights";
+      });
+      root.querySelectorAll<HTMLInputElement>(".hybrid-reward-input").forEach((el) => {
+        el.addEventListener("input", () => { pytorchRewards[el.dataset.key!] = parseFloat(el.value) || 0; });
+      });
+
+      // ObsConfig flags toggle + checkboxes
+      root.querySelector("#obs-config-toggle")!.addEventListener("click", () => {
+        const body = root.querySelector<HTMLElement>("#obs-config-body")!;
+        const visible = body.style.display !== "none";
+        body.style.display = visible ? "none" : "block";
+        root.querySelector("#obs-config-toggle")!.textContent = (visible ? "▸" : "▾") + " Observation Features";
+      });
+      root.querySelectorAll<HTMLInputElement>(".obs-flag-input").forEach((el) => {
+        el.addEventListener("change", () => { obsConfig[el.dataset.key!] = el.checked; });
+      });
       root.querySelector("#opp-type")!.addEventListener("change", () => {
         const t = (root.querySelector<HTMLSelectElement>("#opp-type"))!.value;
         const oppHierOpts = root.querySelector<HTMLElement>("#opp-hier-opts")!;
@@ -416,12 +488,17 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
   }
 
   async function startSim(): Promise<void> {
-    const agentType = (root.querySelector<HTMLSelectElement>("#agent-type"))!.value as "hier" | "greedy" | "random" | "passive" | "pytorch";
+    const agentType = (root.querySelector<HTMLSelectElement>("#agent-type"))!.value as "hier" | "greedy" | "random" | "passive" | "pytorch" | "hybrid";
     const agentFile = agentType === "hier" ? (root.querySelector<HTMLSelectElement>("#agent-file"))!.value || undefined : undefined;
     const saveFile = agentType === "hier" ? ((root.querySelector<HTMLInputElement>("#agent-save"))!.value.trim() || undefined) : undefined;
-    const s3AgentSel = root.querySelector<HTMLSelectElement>("#s3-agent-key");
-    const agentZipKey = agentType === "pytorch" ? (s3AgentSel?.value || "agents/ppo-v1.zip") : undefined;
-    const entrypoint  = agentType === "pytorch" ? (s3AgentSel?.selectedOptions[0]?.dataset.entrypoint || "main.py") : undefined;
+
+    // pytorch uses #s3-agent-key, hybrid uses #hybrid-s3-agent-key
+    const s3AgentSel = agentType === "hybrid"
+      ? root.querySelector<HTMLSelectElement>("#hybrid-s3-agent-key")
+      : root.querySelector<HTMLSelectElement>("#s3-agent-key");
+    const agentZipKey = (agentType === "pytorch" || agentType === "hybrid") ? (s3AgentSel?.value || "agents/ppo-v1.zip") : undefined;
+    const entrypoint  = (agentType === "pytorch" || agentType === "hybrid") ? (s3AgentSel?.selectedOptions[0]?.dataset.entrypoint || "main.py") : undefined;
+
     const oppType = (root.querySelector<HTMLSelectElement>("#opp-type"))!.value as "hier" | "greedy" | "random" | "passive";
     const oppFile = oppType === "hier" ? (root.querySelector<HTMLSelectElement>("#opp-file"))!.value || undefined : undefined;
     const oppSave = oppType === "hier" ? ((root.querySelector<HTMLInputElement>("#opp-save"))!.value.trim() || undefined) : undefined;
@@ -431,11 +508,12 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     const stepDelayMs = Math.round(parseFloat((root.querySelector<HTMLInputElement>("#step-delay"))!.value) * 1000) || 0;
 
     // Build agent config from goals
-    const agentConfig = agentType === "hier" ? buildAgentConfig() : undefined;
-    const rewardWeights = agentType === "pytorch" ? { ...pytorchRewards } : undefined;
+    const agentConfig    = agentType === "hier"    ? buildAgentConfig()    : undefined;
+    const rewardWeights  = (agentType === "pytorch" || agentType === "hybrid") ? { ...pytorchRewards } : undefined;
+    const agentObsConfig = agentType === "hybrid"  ? { ...obsConfig }      : undefined;
 
     const body = {
-      agentSlot: { type: agentType, agentFile, agentConfig, saveFile, agentZipKey, entrypoint, rewardWeights },
+      agentSlot: { type: agentType, agentFile, agentConfig, saveFile, agentZipKey, entrypoint, rewardWeights, obsConfig: agentObsConfig },
       opponentSlot: { type: oppType, agentFile: oppFile, saveFile: oppSave },
       mapSize, episodes, maxTurns, stepDelayMs,
     };

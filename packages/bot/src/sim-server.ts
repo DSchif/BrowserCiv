@@ -45,16 +45,18 @@ const NO_SPAWN = flag("--no-spawn");
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface BotSlotConfig {
-  type: "hier" | "greedy" | "random" | "passive" | "pytorch";
+  type: "hier" | "greedy" | "random" | "passive" | "pytorch" | "hybrid";
   agentFile?: string;
   agentConfig?: HierAgentConfig;
   saveFile?: string;
-  /** S3 key of the agent zip (pytorch type only), e.g. "agents/ppo-v1.zip". */
+  /** S3 key of the agent zip (pytorch/hybrid), e.g. "agents/ppo-v1.zip". */
   agentZipKey?: string;
   /** Python entrypoint inside the zip (default: "main.py"). */
   entrypoint?: string;
-  /** Reward weights forwarded as env vars to the EC2 agent (pytorch only). */
+  /** Reward weights forwarded as env vars to the EC2 agent (pytorch/hybrid). */
   rewardWeights?: Record<string, number>;
+  /** ObsConfig feature flags for the hybrid model (hybrid only). */
+  obsConfig?: Record<string, boolean>;
 }
 
 export interface SimConfig {
@@ -271,6 +273,7 @@ class SimSession {
         agentFile: this.cfg.agentSlot.agentFile ?? null,
         agentZipKey: this.cfg.agentSlot.agentZipKey ?? null,
         saveFile: this.cfg.agentSlot.saveFile ?? null,
+        obsConfig: this.cfg.agentSlot.obsConfig ?? null,
         opponentType: this.cfg.opponentSlot?.type ?? "unknown",
         opponentFile: this.cfg.opponentSlot?.agentFile ?? null,
         mapSize: this.cfg.mapSize,
@@ -296,8 +299,8 @@ class SimSession {
       return;
     }
 
-    // PyTorch path — launch EC2 spot, poll S3 live.json, stream SSE
-    if (this.cfg.agentSlot.type === "pytorch") {
+    // PyTorch / Hybrid path — launch EC2 spot, poll S3 live.json, stream SSE
+    if (this.cfg.agentSlot.type === "pytorch" || this.cfg.agentSlot.type === "hybrid") {
       await this.startPyTorch();
       return;
     }
@@ -591,6 +594,7 @@ class SimSession {
         agentZipKey: this.cfg.agentSlot.agentZipKey,
         entrypoint: this.cfg.agentSlot.entrypoint,
         rewardWeights: this.cfg.agentSlot.rewardWeights,
+        obsConfig: this.cfg.agentSlot.obsConfig,
         amiId,
         instanceProfileArn: profile,
         securityGroupId: sgId,

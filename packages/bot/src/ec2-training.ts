@@ -32,6 +32,8 @@ export interface PyTorchLaunchConfig {
   entrypoint?: string;
   /** Reward weights forwarded as env vars (e.g. REWARD_KILL=2.0). */
   rewardWeights?: Record<string, number>;
+  /** ObsConfig feature flags for the hybrid model (serialised as OBS_CONFIG JSON). */
+  obsConfig?: Record<string, boolean>;
   // Infrastructure
   amiId: string;
   instanceType?: string;
@@ -204,6 +206,7 @@ ${cfg.hiddenLayers  ? `export HIDDEN="${cfg.hiddenLayers}"` : ""}
 ${cfg.learningRate  ? `export LR="${cfg.learningRate}"` : ""}
 ${cfg.stepDelayMs  ? `export STEP_DELAY="${(cfg.stepDelayMs / 1000).toFixed(3)}"` : ""}
 ${cfg.rewardWeights ? Object.entries(cfg.rewardWeights).map(([k, v]) => `export ${k}="${v}"`).join("\n") : ""}
+${cfg.obsConfig ? `export OBS_CONFIG='${JSON.stringify(cfg.obsConfig)}'` : ""}
 
 python3.11 ${entrypoint} || true
 `;
