@@ -623,8 +623,9 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     });
     root.querySelector("#btn-results")!.addEventListener("click", () => renderResults());
     root.querySelector("#btn-back-to-setup")!.addEventListener("click", () => {
-      if (simId) void simFetch(`/sim/${simId}`, { method: "DELETE" });
+      // Don't delete the sim — leave it running so it shows up in the active table.
       cleanup();
+      simId = null;
       phase = "setup";
       renderSetup();
     });
@@ -750,19 +751,25 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
   // ── Spectator WS connection ──────────────────────────────────────────────
 
   let cumulativeReward = 0;
+  let spectatorGen = 0;
 
   function connectSpectator(matchId: string, token: string, asPlayer = "", serverUrl?: string): void {
+    // Increment generation so any in-flight retries from the previous match bail out.
+    spectatorGen++;
+    const gen = spectatorGen;
     if (mapViewer) mapViewer.clearLayerCaches();
     gameClient?.close();
     let retries = 0;
     const tryConnect = (): void => {
+      if (gen !== spectatorGen) return; // superseded by a newer connectSpectator call
       gameClient = new GameClient(matchId, "", token, {
         onOpen: () => { retries = 0; },
         onClose: () => {
-          // Reconnect while this matchId is still active (episode still in progress).
-          if (retries < 5 && currentStatus?.matchId === matchId) {
+          if (gen !== spectatorGen) return; // superseded — don't retry stale match
+          // Only retry while this matchId is still the current episode.
+          if (retries < 3 && currentStatus?.matchId === matchId) {
             retries++;
-            setTimeout(tryConnect, 1000 * retries);
+            setTimeout(tryConnect, 500 * retries);
           }
         },
         onState: (state) => {
