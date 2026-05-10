@@ -981,10 +981,11 @@ const server = createServer((req, res) => {
     return; // response stays open
   }
 
-  // ── EC2 instance management ────────────────────────────────────────────────
+  // ── EC2 instance management — under /sim/instances/* so it falls within the
+  //    /sim proxy that the game server already forwards to localhost:3334 ─────
 
-  // GET /instances — list all running training instances with live state from S3
-  if (method === "GET" && path === "/instances") {
+  // GET /sim/instances — list all running training instances with live state from S3
+  if (method === "GET" && path === "/sim/instances") {
     const bucket = process.env.MODEL_BUCKET ?? "";
     void (async () => {
       const infos = await listRunningTrainingInstances();
@@ -997,40 +998,11 @@ const server = createServer((req, res) => {
     return;
   }
 
-  // DELETE /instances/:instanceId — terminate an EC2 training instance
-  const instDeleteMatch = path.match(/^\/instances\/([^/]+)$/);
+  // DELETE /sim/instances/:instanceId — terminate an EC2 training instance
+  const instDeleteMatch = path.match(/^\/sim\/instances\/([^/]+)$/);
   if (method === "DELETE" && instDeleteMatch) {
     const instanceId = instDeleteMatch[1]!;
     void terminateEc2Instance(instanceId).then(() => json(res, { ok: true })).catch(() => json(res, { ok: false }, 500));
-    return;
-  }
-
-  // POST /instances/:instanceId/watch — attach a new session to a running instance
-  const instWatchMatch = path.match(/^\/instances\/([^/]+)\/watch$/);
-  if (method === "POST" && instWatchMatch) {
-    const instanceId = instWatchMatch[1]!;
-    const bucket = process.env.MODEL_BUCKET ?? "";
-    void (async () => {
-      if (!bucket) { json(res, { error: "MODEL_BUCKET not configured" }, 400); return; }
-      // Find its liveKey from EC2 tags
-      const infos = await listRunningTrainingInstances();
-      const inst = infos.find((i) => i.instanceId === instanceId);
-      if (!inst?.liveKey) { json(res, { error: "Instance not found or has no RunPrefix tag" }, 404); return; }
-      const live = await getPyTorchLiveState(bucket, inst.liveKey);
-      const id = String(nextSimId++);
-      const session = new SimSession(id, {
-        agentSlot: { type: "pytorch" },
-        opponentSlot: { type: "greedy" },
-        mapSize: "small",
-        episodes: live?.totalEpisodes ?? 1,
-        maxTurns: live?.maxTurns ?? 500,
-        attachInstanceId: instanceId,
-        attachLiveKey: inst.liveKey,
-      });
-      sessions.set(id, session);
-      void session.start();
-      json(res, { simId: id });
-    })();
     return;
   }
 

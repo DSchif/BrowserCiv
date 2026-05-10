@@ -85,7 +85,7 @@ interface Ec2InstanceInfo {
 }
 
 async function getEc2Instances(): Promise<Ec2InstanceInfo[]> {
-  const r = await simFetch("/instances");
+  const r = await simFetch("/sim/instances");
   return r.ok ? (r.json() as Promise<Ec2InstanceInfo[]>) : [];
 }
 
@@ -155,6 +155,7 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
   let renderRafId: number | null = null;
   let latestSnap: TurnSnap | null = null;
   let snapRafId: number | null = null;
+  let ec2PollId: ReturnType<typeof setInterval> | null = null;
 
   // ── Active-sim table (setup page) ───────────────────────────────────────────
 
@@ -262,18 +263,16 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
       if (!row) continue;
       row.querySelector(".ec2-stop")?.addEventListener("click", () => {
         if (!confirm(`Terminate EC2 instance ${inst.instanceId}?`)) return;
-        void simFetch(`/instances/${inst.instanceId}`, { method: "DELETE" }).then(() => refreshActiveSims());
+        void simFetch(`/sim/instances/${inst.instanceId}`, { method: "DELETE" }).then(() => refreshActiveSims());
       });
       row.querySelector(".ec2-watch")?.addEventListener("click", () => {
         stopSetupPoll();
-        void simFetch(`/instances/${inst.instanceId}/watch`, { method: "POST" }).then(async (r) => {
-          if (!r.ok) { alert("Failed to attach to instance"); return; }
-          const { simId: id } = await r.json() as { simId: string };
-          simId = id;
-          episodeLog = [];
-          phase = "running";
-          renderRunner();
-        });
+        // No server session — connect as spectator directly using live.json data.
+        simId = null;
+        episodeLog = [];
+        phase = "running";
+        renderRunner();
+        startEc2Watcher(inst.instanceId);
       });
     }
   }
@@ -1240,10 +1239,49 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     goTo(0);
   }
 
+  // ── EC2 direct spectator watcher ─────────────────────────────────────────────
+
+  function startEc2Watcher(instanceId: string): void {
+    if (ec2PollId !== null) { clearInterval(ec2PollId); ec2PollId = null; }
+    let lastMatchId: string | null = null;
+
+    const poll = async (): Promise<void> => {
+      if (phase !== "running") { clearInterval(ec2PollId!); ec2PollId = null; return; }
+      const instances = await getEc2Instances().catch(() => [] as Ec2InstanceInfo[]);
+      const inst = instances.find((i) => i.instanceId === instanceId);
+      const live = inst?.live ?? null;
+      if (!live) return;
+
+      const epBadge = root.querySelector("#ep-badge");
+      const turnLabel = root.querySelector("#turn-label");
+      const stateLabel = root.querySelector<HTMLElement>("#state-label");
+      if (epBadge) epBadge.textContent = `Ep ${live.episode + 1}/${live.totalEpisodes}`;
+      if (turnLabel) turnLabel.textContent = `Turn ${live.turn}/${live.maxTurns}`;
+      if (stateLabel) {
+        stateLabel.textContent = live.done ? "DONE" : "RUNNING (EC2)";
+        stateLabel.className = `sim-state-label ${live.done ? "done" : "running"}`;
+      }
+
+      if (live.matchId && live.spectatorToken && live.matchId !== lastMatchId) {
+        lastMatchId = live.matchId;
+        latestMatchState = null;
+        mapViewer?.clearLayerCaches();
+        graphPanel?.clear();
+        connectSpectator(live.matchId, live.spectatorToken);
+      }
+
+      if (live.done) { clearInterval(ec2PollId!); ec2PollId = null; }
+    };
+
+    void poll();
+    ec2PollId = setInterval(() => { void poll(); }, 2000);
+  }
+
   // ── Cleanup ─────────────────────────────────────────────────────────────────
 
   function cleanup(): void {
     stopSetupPoll();
+    if (ec2PollId !== null) { clearInterval(ec2PollId); ec2PollId = null; }
     sseSource?.close(); sseSource = null;
     gameClient?.close(); gameClient = null;
     if (renderRafId !== null) { cancelAnimationFrame(renderRafId); renderRafId = null; }
