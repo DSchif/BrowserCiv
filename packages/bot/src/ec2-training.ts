@@ -6,6 +6,7 @@ import {
   EC2Client,
   RunInstancesCommand,
   DescribeInstancesCommand,
+  TerminateInstancesCommand,
 } from "@aws-sdk/client-ec2";
 import { S3Client, GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 
@@ -146,6 +147,50 @@ export async function getS3Json(bucket: string, key: string): Promise<unknown | 
   }
 }
 
+export async function terminateEc2Instance(instanceId: string): Promise<void> {
+  try {
+    await ec2.send(new TerminateInstancesCommand({ InstanceIds: [instanceId] }));
+    console.log(`[ec2] terminated instance ${instanceId}`);
+  } catch (e) {
+    console.error(`[ec2] failed to terminate ${instanceId}:`, e);
+  }
+}
+
+export interface RunningInstanceInfo {
+  instanceId: string;
+  instanceType: string;
+  launchTime: string | undefined;
+  runPrefix: string | null;
+  liveKey: string | null;
+}
+
+export async function listRunningTrainingInstances(): Promise<RunningInstanceInfo[]> {
+  try {
+    const res = await ec2.send(new DescribeInstancesCommand({
+      Filters: [
+        { Name: "tag:Project",              Values: ["BrowserCiv"] },
+        { Name: "tag:Name",                 Values: ["browserciv-training"] },
+        { Name: "instance-state-name",      Values: ["pending", "running"] },
+      ],
+    }));
+    const infos: RunningInstanceInfo[] = [];
+    for (const r of res.Reservations ?? []) {
+      for (const inst of r.Instances ?? []) {
+        if (!inst.InstanceId) continue;
+        const runPrefix = inst.Tags?.find((t) => t.Key === "RunPrefix")?.Value ?? null;
+        infos.push({
+          instanceId: inst.InstanceId,
+          instanceType: inst.InstanceType ?? "unknown",
+          launchTime: inst.LaunchTime?.toISOString(),
+          runPrefix,
+          liveKey: runPrefix ? `${runPrefix}/live.json` : null,
+        });
+      }
+    }
+    return infos;
+  } catch { return []; }
+}
+
 export async function describeTrainingInstance(instanceId: string) {
   const res = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
   return res.Reservations?.[0]?.Instances?.[0] ?? null;
@@ -208,6 +253,7 @@ ${cfg.stepDelayMs  ? `export STEP_DELAY="${(cfg.stepDelayMs / 1000).toFixed(3)}"
 ${cfg.rewardWeights ? Object.entries(cfg.rewardWeights).map(([k, v]) => `export ${k}="${v}"`).join("\n") : ""}
 ${cfg.obsConfig ? `export OBS_CONFIG='${JSON.stringify(cfg.obsConfig)}'` : ""}
 
-python3.11 ${entrypoint} || true
+# 4-hour hard ceiling — terminates training and then EXIT trap self-destructs.
+timeout 14400 python3.11 ${entrypoint} || true
 `;
 }

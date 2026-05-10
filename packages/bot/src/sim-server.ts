@@ -22,7 +22,10 @@ import { HierAgent } from "./agent2/hier-agent.js";
 import type { HierAgentConfig } from "./agent2/config.js";
 import { DEFAULT_HIER_CONFIG } from "./agent2/config.js";
 import { runHierTrainingEpisode, type StepController } from "./hier-train-runner.js";
-import { launchPyTorchTraining, getPyTorchLiveState, getS3Json, listS3Agents } from "./ec2-training.js";
+import {
+  launchPyTorchTraining, getPyTorchLiveState, getS3Json, listS3Agents,
+  terminateEc2Instance, listRunningTrainingInstances,
+} from "./ec2-training.js";
 import { snapTurn, type EpisodeDump, type TurnSnap } from "./dump.js";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -67,6 +70,9 @@ export interface SimConfig {
   maxTurns: number;
   gameServerUrl?: string;
   stepDelayMs?: number;
+  /** When set, skip EC2 launch and attach to this already-running instance. */
+  attachInstanceId?: string;
+  attachLiveKey?: string;
 }
 
 type SimState = "idle" | "running" | "paused" | "done" | "aborted";
@@ -144,6 +150,7 @@ class SimSession {
   private agent2: HierAgent | null = null;
   private content: ContentPack | null = null;
   private stepPauseAfter = false;
+  private instanceId: string | null = null;
 
   constructor(id: string, cfg: SimConfig) {
     this.id = id;
@@ -179,6 +186,9 @@ class SimSession {
     this.paused = false;
     this.trigger.fire();
     this.state = "aborted";
+    if (this.instanceId) {
+      void terminateEc2Instance(this.instanceId);
+    }
     this.emitStatus();
   }
 
@@ -268,6 +278,7 @@ class SimSession {
       runId: this.runId,
       agentPlayerId: this.agentPlayerId,
       episodeLog: this.episodeLog,
+      instanceId: this.instanceId,
       displayInfo: this.cfg.agentSlot ? {
         agentType: this.cfg.agentSlot.type,
         agentFile: this.cfg.agentSlot.agentFile ?? null,
@@ -296,6 +307,14 @@ class SimSession {
       console.error("[sim-server] failed to load content pack:", e);
       this.state = "aborted";
       this.emitStatus();
+      return;
+    }
+
+    // Attach to existing EC2 instance (no new launch)
+    if (this.cfg.attachInstanceId && this.cfg.attachLiveKey) {
+      this.instanceId = this.cfg.attachInstanceId;
+      this.gameServerUrl = process.env.GAME_SERVER_EXTERNAL ?? this.cfg.gameServerUrl ?? SERVER_URL;
+      await this.runEc2PollingLoop(this.cfg.attachLiveKey);
       return;
     }
 
@@ -391,6 +410,10 @@ class SimSession {
 
       // Connect spectator WS for full-visibility metrics (no fog artifacts)
       let latestSpectatorView: MatchView | null = null;
+      // Kill counting from fog-free spectator view: diff consecutive enemy unit sets.
+      let prevSpecEnemyIds: Set<string> = new Set();
+      let specKills = 0;
+      const agentId = setup.agentToken.playerId;
       const baseUrl = this.cfg.gameServerUrl ?? SERVER_URL;
       const wsBase = baseUrl.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
       const specWs = new WebSocket(`${wsBase}/ws?token=${encodeURIComponent(setup.spectatorToken.token)}`);
@@ -400,7 +423,19 @@ class SimSession {
       specWs.on("message", (raw) => {
         try {
           const msg = JSON.parse(String(raw)) as { type: string; state?: MatchView };
-          if (msg.type === "Snapshot" && msg.state) latestSpectatorView = msg.state as MatchView;
+          if (msg.type === "Snapshot" && msg.state) {
+            latestSpectatorView = msg.state as MatchView;
+            // Count kills by detecting enemy units that left the spectator view (not fog—spectator sees all).
+            const curEnemyIds = new Set(
+              latestSpectatorView.units.filter((u) => u.ownerId !== agentId).map((u) => u.id),
+            );
+            if (prevSpecEnemyIds.size > 0) {
+              for (const id of prevSpecEnemyIds) {
+                if (!curEnemyIds.has(id)) specKills++;
+              }
+            }
+            prevSpecEnemyIds = curEnemyIds;
+          }
         } catch { /**/ }
       });
 
@@ -451,10 +486,12 @@ class SimSession {
             const durMs = now - lastSnapMs;
             lastSnapMs = now;
             // Spectator view gives accurate full-visibility city/unit counts.
+            // Use specKills (tracked from fog-free spectator WS) to avoid counting units
+            // that merely walked out of the agent's fog as kills.
             // Preserve seenTiles/totalTiles from the agent's fogged view for real exploration %.
             const snap: TurnSnap = latestSpectatorView
               ? {
-                  ...snapTurn(latestSpectatorView, setup.agentToken.playerId, agentSnap.cumKills, agentSnap.cumCaptures),
+                  ...snapTurn(latestSpectatorView, setup.agentToken.playerId, specKills, agentSnap.cumCaptures),
                   seenTiles: agentSnap.seenTiles,
                   totalTiles: agentSnap.totalTiles,
                 }
@@ -586,7 +623,7 @@ class SimSession {
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const runPrefix = `runs/${ts}`;
 
-    this.log(`Launching EC2 spot instance (${amiId}, c5.2xlarge) in subnet ${subnet} …`);
+    this.log(`Launching EC2 spot instance (${amiId}) in subnet ${subnet} …`);
 
     let handle: { instanceId: string; liveKey: string };
     try {
@@ -615,12 +652,19 @@ class SimSession {
       return;
     }
 
+    this.instanceId = handle.instanceId;
     this.runId = runPrefix;
     this.gameServerUrl = extUrl;
     this.log(`EC2 instance ${handle.instanceId} launched. Waiting for training to begin …`);
     this.log(`Game server: ${extUrl}`);
     this.log(`S3 run prefix: s3://${bucket}/${runPrefix}`);
-    this.log(`Polling s3://${bucket}/${handle.liveKey} every 3s for live state`);
+
+    await this.runEc2PollingLoop(handle.liveKey, runPrefix);
+  }
+
+  private async runEc2PollingLoop(liveKey: string, runPrefix?: string): Promise<void> {
+    const bucket = process.env.MODEL_BUCKET ?? "";
+    const wsUrl  = (this.gameServerUrl ?? SERVER_URL).replace("https://", "wss://").replace("http://", "ws://");
 
     let lastEpisode = -1;
     let pollsWithoutData = 0;
@@ -632,9 +676,6 @@ class SimSession {
     let currentKills = 0;
     let currentCaptures = 0;
 
-    const wsUrl = (this.cfg.gameServerUrl ?? SERVER_URL)
-      .replace("https://", "wss://").replace("http://", "ws://");
-
     const connectSpec = (matchId: string, token: string, agentPlayerId: string) => {
       if (specWs) { try { specWs.close(); } catch { /**/ } }
       latestSpecState = null;
@@ -642,7 +683,7 @@ class SimSession {
       specPlayerId = agentPlayerId;
 
       const doConnect = () => {
-        if (specMatchId !== matchId || this.aborted) return; // superseded by newer episode
+        if (specMatchId !== matchId || this.aborted) return;
         const ws = new WebSocket(`${wsUrl}/ws?token=${token}`);
         specWs = ws;
         ws.on("message", (raw: Buffer) => {
@@ -652,48 +693,44 @@ class SimSession {
               latestSpecState = msg.state as MatchView;
               if (specPlayerId) {
                 const snap = snapTurn(latestSpecState, specPlayerId, currentKills, currentCaptures);
-                this.currentTurn = snap.turn;  // game turnNumber — the only authoritative source
+                this.currentTurn = snap.turn;
                 this.emit("snapshot", { episode: this.currentEpisode, turn: snap.turn, snap });
               }
             }
           } catch { /**/ }
         });
         ws.on("close", () => {
-          // Don't reconnect to a match that already finished — wait for S3 to supply a new matchId.
           const matchFinished = latestSpecState?.status === "finished";
           if (specMatchId === matchId && !this.aborted && !matchFinished) {
             this.log(`[spec] WS closed for ep ${this.currentEpisode} — reconnecting in 3s`);
             setTimeout(doConnect, 3000);
           }
         });
-        ws.on("error", (err: Error) => {
-          this.log(`[spec] WS error: ${err.message}`);
-          // close event fires after error and handles reconnect
-        });
+        ws.on("error", (err: Error) => { this.log(`[spec] WS error: ${err.message}`); });
       };
       doConnect();
     };
 
-    // Poll S3 live.json until done or aborted
+    this.log(`Polling s3://${bucket}/${liveKey} every 1.5s for live state`);
+
     while (!this.aborted) {
       await new Promise<void>((r) => setTimeout(r, 1500));
-      const live = await getPyTorchLiveState(bucket, handle.liveKey);
+      const live = await getPyTorchLiveState(bucket, liveKey);
 
       if (!live) {
         pollsWithoutData++;
-        if (pollsWithoutData === 10) this.log("Instance booting — downloading agent-py.zip from S3 …");
+        if (pollsWithoutData === 10) this.log("Instance booting — downloading agent zip from S3 …");
         if (pollsWithoutData === 30) this.log("Installing Python dependencies (torch, aiohttp) …");
-        if (pollsWithoutData === 50) this.log("Still waiting — instance may be initialising or pip install is running …");
+        if (pollsWithoutData === 50) this.log("Still waiting — instance may be initialising …");
         continue;
       }
 
       pollsWithoutData = 0;
 
-      // Connect spectator WS for each new episode so we can get real game metrics.
       if (live.episode !== lastEpisode) {
         this.log(`Episode ${live.episode + 1}/${live.totalEpisodes} started — match ${live.matchId ?? "?"}`);
         lastEpisode = live.episode;
-        this.currentTurn = 0;  // reset on episode boundary
+        this.currentTurn = 0;
         if (live.matchId && live.spectatorToken && live.agentPlayerId) {
           connectSpec(live.matchId, live.spectatorToken, live.agentPlayerId);
         }
@@ -702,8 +739,6 @@ class SimSession {
       currentKills    = live.cumKills ?? 0;
       currentCaptures = live.cumCaptures ?? 0;
       this.currentEpisode = live.episode;
-      // Do NOT use live.turn here — that's Python's step() call count (actions), not game turns.
-      // currentTurn is maintained exclusively by the spectator WS using view.turnNumber.
       this.matchId        = live.matchId;
       this.spectatorToken = live.spectatorToken;
       if (live.agentPlayerId) this.agentPlayerId = live.agentPlayerId;
@@ -712,15 +747,14 @@ class SimSession {
 
       if (live.done) {
         this.log(`Training complete — ${live.totalEpisodes} episodes finished.`);
-        const sw = specWs;
-        if (sw) { try { sw.close(); } catch { /**/ } }
+        if (specWs) { try { specWs.close(); } catch { /**/ } }
         break;
       }
     }
 
     if (!this.aborted) {
-      // Read per-episode records from the progress.json the training script wrote.
-      const progressKey = `${runPrefix}/model.pt.progress.json`;
+      const prefix = runPrefix ?? liveKey.replace(/\/live\.json$/, "");
+      const progressKey = `${prefix}/model.pt.progress.json`;
       const progress = await getS3Json(bucket, progressKey) as { records?: unknown[] } | null;
       const summary = progress?.records ?? [];
       this.emit("done", { summary });
@@ -945,6 +979,59 @@ const server = createServer((req, res) => {
     if (!session) return notFound(res);
     session.addSSEClient(res);
     return; // response stays open
+  }
+
+  // ── EC2 instance management ────────────────────────────────────────────────
+
+  // GET /instances — list all running training instances with live state from S3
+  if (method === "GET" && path === "/instances") {
+    const bucket = process.env.MODEL_BUCKET ?? "";
+    void (async () => {
+      const infos = await listRunningTrainingInstances();
+      const results = await Promise.all(infos.map(async (inst) => {
+        const live = (inst.liveKey && bucket) ? await getPyTorchLiveState(bucket, inst.liveKey) : null;
+        return { ...inst, live };
+      }));
+      json(res, results);
+    })();
+    return;
+  }
+
+  // DELETE /instances/:instanceId — terminate an EC2 training instance
+  const instDeleteMatch = path.match(/^\/instances\/([^/]+)$/);
+  if (method === "DELETE" && instDeleteMatch) {
+    const instanceId = instDeleteMatch[1]!;
+    void terminateEc2Instance(instanceId).then(() => json(res, { ok: true })).catch(() => json(res, { ok: false }, 500));
+    return;
+  }
+
+  // POST /instances/:instanceId/watch — attach a new session to a running instance
+  const instWatchMatch = path.match(/^\/instances\/([^/]+)\/watch$/);
+  if (method === "POST" && instWatchMatch) {
+    const instanceId = instWatchMatch[1]!;
+    const bucket = process.env.MODEL_BUCKET ?? "";
+    void (async () => {
+      if (!bucket) { json(res, { error: "MODEL_BUCKET not configured" }, 400); return; }
+      // Find its liveKey from EC2 tags
+      const infos = await listRunningTrainingInstances();
+      const inst = infos.find((i) => i.instanceId === instanceId);
+      if (!inst?.liveKey) { json(res, { error: "Instance not found or has no RunPrefix tag" }, 404); return; }
+      const live = await getPyTorchLiveState(bucket, inst.liveKey);
+      const id = String(nextSimId++);
+      const session = new SimSession(id, {
+        agentSlot: { type: "pytorch" },
+        opponentSlot: { type: "greedy" },
+        mapSize: "small",
+        episodes: live?.totalEpisodes ?? 1,
+        maxTurns: live?.maxTurns ?? 500,
+        attachInstanceId: instanceId,
+        attachLiveKey: inst.liveKey,
+      });
+      sessions.set(id, session);
+      void session.start();
+      json(res, { simId: id });
+    })();
+    return;
   }
 
   notFound(res);

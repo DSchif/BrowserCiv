@@ -216,6 +216,7 @@ export class BrowserCivStack extends cdk.Stack {
           "ec2:RunInstances",
           "ec2:DescribeInstances",
           "ec2:CreateTags",
+          "ec2:TerminateInstances",
         ],
         resources: ["*"],
       }),

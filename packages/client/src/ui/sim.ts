@@ -79,6 +79,16 @@ async function getS3Agents(): Promise<S3AgentEntry[]> {
   return r.ok ? (r.json() as Promise<S3AgentEntry[]>) : [];
 }
 
+interface Ec2InstanceInfo {
+  instanceId: string; instanceType: string; launchTime?: string; runPrefix: string | null;
+  live: { episode: number; totalEpisodes: number; turn: number; maxTurns: number; matchId: string | null; spectatorToken: string | null; done: boolean; } | null;
+}
+
+async function getEc2Instances(): Promise<Ec2InstanceInfo[]> {
+  const r = await simFetch("/instances");
+  return r.ok ? (r.json() as Promise<Ec2InstanceInfo[]>) : [];
+}
+
 async function getRuns(): Promise<RunMeta[]> {
   const r = await simFetch("/runs");
   return r.ok ? (r.json() as Promise<RunMeta[]>) : [];
@@ -154,51 +164,67 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
 
   async function refreshActiveSims(): Promise<void> {
     const container = root.querySelector<HTMLElement>("#active-sims");
-    if (!container) return; // no longer on setup page
-    const sessions = await getActiveSessions().catch(() => [] as ActiveSession[]);
+    if (!container) return;
 
-    if (sessions.length === 0) {
+    const [sessions, ec2Instances] = await Promise.all([
+      getActiveSessions().catch(() => [] as ActiveSession[]),
+      getEc2Instances().catch(() => [] as Ec2InstanceInfo[]),
+    ]);
+
+    if (sessions.length === 0 && ec2Instances.length === 0) {
       container.innerHTML = "";
       return;
     }
 
-    const rows = sessions.map((s) => {
+    const zipName = (key: string | null) => key ? key.replace(/^agents\//, "").replace(/\.zip$/, "") : null;
+
+    const sessionRows = sessions.map((s) => {
       const info = s.displayInfo;
-      const zipName = (key: string | null) => key ? key.replace(/^agents\//, "").replace(/\.zip$/, "") : null;
       const agentLabel = !info ? "—"
-        : info.agentType === "pytorch"
-          ? `EC2 ${zipName(info.agentZipKey) ?? "ppo"}`
-          : info.agentType === "hybrid"
-            ? `Hybrid ${zipName(info.agentZipKey) ?? "hybrid"}`
-            : info.agentType === "hier"
-              ? `RL ${info.agentFile ? `(${info.agentFile})` : "(fresh)"}`
-              : info.agentType;
+        : info.agentType === "pytorch" ? `EC2 ${zipName(info.agentZipKey) ?? "ppo"}`
+        : info.agentType === "hybrid"  ? `Hybrid ${zipName(info.agentZipKey) ?? "hybrid"}`
+        : info.agentType === "hier"    ? `RL ${info.agentFile ? `(${info.agentFile})` : "(fresh)"}`
+        : info.agentType;
       const oppLabel = !info ? "—"
-        : info.opponentType === "hier"
-          ? `RL ${info.opponentFile ? `(${info.opponentFile})` : "(fresh)"}`
-          : info.opponentType;
-      const mapLabel = info?.mapSize ?? "—";
+        : info.opponentType === "hier" ? `RL ${info.opponentFile ? `(${info.opponentFile})` : "(fresh)"}` : info.opponentType;
       const isPaused = s.state === "paused";
       const isRunning = s.state === "running";
       const stateClass = isRunning ? "running" : isPaused ? "paused" : "done";
-
       return `
         <tr data-sid="${s.id}">
           <td><span class="sim-state-label ${stateClass}">${s.state.toUpperCase()}</span></td>
           <td>${s.episode}/${s.totalEpisodes}</td>
           <td>${s.turn}/${s.maxTurns}</td>
-          <td>${agentLabel}</td>
-          <td>${oppLabel}</td>
-          <td>${mapLabel}</td>
+          <td>${agentLabel}</td><td>${oppLabel}</td><td>${info?.mapSize ?? "—"}</td>
           <td class="sim-active-actions">
             ${isRunning ? `<button class="sim-ctrl-btn asim-pause" title="Pause">⏸</button>` : ""}
-            ${isPaused ? `<button class="sim-ctrl-btn asim-resume" title="Resume">▶</button>` : ""}
-            ${isPaused ? `<button class="sim-ctrl-btn asim-step"   title="Step one turn">⏭</button>` : ""}
-            <button class="sim-ctrl-btn asim-stop"    title="Stop">⏹</button>
-            <button class="sim-ctrl-btn asim-watch"   title="Watch">👁 Watch</button>
+            ${isPaused  ? `<button class="sim-ctrl-btn asim-resume" title="Resume">▶</button>` : ""}
+            ${isPaused  ? `<button class="sim-ctrl-btn asim-step" title="Step one turn">⏭</button>` : ""}
+            <button class="sim-ctrl-btn asim-stop" title="Stop">⏹</button>
+            <button class="sim-ctrl-btn asim-watch" title="Watch">👁 Watch</button>
           </td>
         </tr>`;
     }).join("");
+
+    const ec2Rows = ec2Instances.map((inst) => {
+      const ep   = inst.live ? `${inst.live.episode + 1}/${inst.live.totalEpisodes}` : "—/—";
+      const turn = inst.live ? `${inst.live.turn}/${inst.live.maxTurns}` : "—/—";
+      const runName = inst.runPrefix ? inst.runPrefix.replace(/^runs\//, "") : inst.instanceId.slice(0, 12);
+      const launched = inst.launchTime ? new Date(inst.launchTime).toLocaleTimeString() : "—";
+      return `
+        <tr data-iid="${inst.instanceId}">
+          <td><span class="sim-state-label running">EC2</span></td>
+          <td>${ep}</td><td>${turn}</td>
+          <td>EC2 ${inst.instanceType}</td><td>—</td><td title="${runName}">${launched}</td>
+          <td class="sim-active-actions">
+            <button class="sim-ctrl-btn ec2-stop" title="Terminate instance">⏹ Stop</button>
+            <button class="sim-ctrl-btn ec2-watch" title="Watch live">👁 Watch</button>
+          </td>
+        </tr>`;
+    }).join("");
+
+    const allRows = sessionRows + ec2Rows;
+    if (!allRows) { container.innerHTML = ""; return; }
 
     container.innerHTML = `
       <div class="sim-active-section">
@@ -206,27 +232,19 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
         <table class="sim-active-table">
           <thead><tr>
             <th>State</th><th>Episode</th><th>Turn</th>
-            <th>Agent</th><th>Opponent</th><th>Map</th><th>Actions</th>
+            <th>Agent</th><th>Opponent</th><th>Map / Launched</th><th>Actions</th>
           </tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody>${allRows}</tbody>
         </table>
       </div>`;
 
-    // Wire per-row buttons
     for (const s of sessions) {
       const row = container.querySelector<HTMLElement>(`tr[data-sid="${s.id}"]`);
       if (!row) continue;
-
-      row.querySelector(".asim-pause")?.addEventListener("click", () => {
-        void simFetch(`/sim/${s.id}/pause`, { method: "POST" });
-      });
-      row.querySelector(".asim-resume")?.addEventListener("click", () => {
-        void simFetch(`/sim/${s.id}/resume`, { method: "POST", body: JSON.stringify({ speed: "fast" }) });
-      });
-      row.querySelector(".asim-step")?.addEventListener("click", () => {
-        void simFetch(`/sim/${s.id}/step`, { method: "POST" });
-      });
-      row.querySelector(".asim-stop")?.addEventListener("click", () => {
+      row.querySelector(".asim-pause")?.addEventListener("click",  () => { void simFetch(`/sim/${s.id}/pause`,  { method: "POST" }); });
+      row.querySelector(".asim-resume")?.addEventListener("click", () => { void simFetch(`/sim/${s.id}/resume`, { method: "POST", body: JSON.stringify({ speed: "fast" }) }); });
+      row.querySelector(".asim-step")?.addEventListener("click",   () => { void simFetch(`/sim/${s.id}/step`,   { method: "POST" }); });
+      row.querySelector(".asim-stop")?.addEventListener("click",   () => {
         if (!confirm("Stop this simulation?")) return;
         void simFetch(`/sim/${s.id}`, { method: "DELETE" }).then(() => refreshActiveSims());
       });
@@ -236,6 +254,26 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
         episodeLog = s.episodeLog ?? [];
         phase = "running";
         renderRunner();
+      });
+    }
+
+    for (const inst of ec2Instances) {
+      const row = container.querySelector<HTMLElement>(`tr[data-iid="${inst.instanceId}"]`);
+      if (!row) continue;
+      row.querySelector(".ec2-stop")?.addEventListener("click", () => {
+        if (!confirm(`Terminate EC2 instance ${inst.instanceId}?`)) return;
+        void simFetch(`/instances/${inst.instanceId}`, { method: "DELETE" }).then(() => refreshActiveSims());
+      });
+      row.querySelector(".ec2-watch")?.addEventListener("click", () => {
+        stopSetupPoll();
+        void simFetch(`/instances/${inst.instanceId}/watch`, { method: "POST" }).then(async (r) => {
+          if (!r.ok) { alert("Failed to attach to instance"); return; }
+          const { simId: id } = await r.json() as { simId: string };
+          simId = id;
+          episodeLog = [];
+          phase = "running";
+          renderRunner();
+        });
       });
     }
   }
@@ -750,7 +788,6 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
 
   // ── Spectator WS connection ──────────────────────────────────────────────
 
-  let cumulativeReward = 0;
   let spectatorGen = 0;
 
   function connectSpectator(matchId: string, token: string, asPlayer = "", serverUrl?: string): void {
@@ -845,9 +882,10 @@ export function renderSim(root: HTMLElement, onBack: () => void): void {
     sseSource.addEventListener("episode", (e) => {
       const ep = JSON.parse(e.data) as EpRecord;
       episodeLog.push(ep);
-      cumulativeReward += ep.reward;
+      // Freeze the reward label at the final episode value — it will reset to 0.0
+      // when the next episode's status event fires (new matchId detected).
       const rewardEl = root.querySelector("#reward-label span");
-      if (rewardEl) rewardEl.textContent = cumulativeReward.toFixed(1);
+      if (rewardEl) rewardEl.textContent = ep.reward.toFixed(1);
     });
 
     sseSource.addEventListener("done", (e: MessageEvent) => {
